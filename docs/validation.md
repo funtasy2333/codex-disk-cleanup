@@ -22,6 +22,11 @@ Version: 0.1.0. Research/development date: 2026-10-10.
 
 ## Continuous integration
 
+Runtime commit `340165fb703c1cf551f050822f146e4453327121` passed all six matrix jobs:
+[run 38060756527](https://github.com/funtasy2333/codex-disk-cleanup/actions/runs/38060756527).
+Each job ran 62 tests plus package checks and ZIP generation. This establishes
+cross-platform fixture behavior, not desktop-native hook dispatch acceptance.
+
 `.github/workflows/ci.yml` runs the same suite on `ubuntu-latest`, `macos-latest`,
 and `windows-latest`, Python 3.10 and 3.13. Current results must be read from
 [GitHub Actions](https://github.com/funtasy2333/codex-disk-cleanup/actions/workflows/ci.yml),
