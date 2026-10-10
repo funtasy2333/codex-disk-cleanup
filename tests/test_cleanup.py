@@ -117,7 +117,8 @@ class CleanupTests(unittest.TestCase):
 
     def test_protected_names(self):
         for name in ['outputs/test_a.py', 'skills/test_a.py', '.env', 'auth.json',
-                     'AGENTS.md', 'file.sqlite3', 'x.key', '.git/test_a.py']:
+                     'AGENTS.md', 'file.sqlite3', 'x.key', '.git/test_a.py', 'config.json',
+                     'state.sqlite3-wal', 'state.sqlite-shm', 'state.db-journal']:
             with self.subTest(name=name):
                 with self.assertRaises(c.Refused):
                     self.store.candidate(self.root / name, self.root)
@@ -299,6 +300,14 @@ class CleanupTests(unittest.TestCase):
         self.store.config['auto'] = 'quarantine'
         self.store.hook(self.payload('SessionEnd'))
         self.assertFalse(path.exists())
+
+    def test_stop_missing_turn_skips_cleanup(self):
+        path = self.create()
+        self.store.config['auto'] = 'quarantine'
+        payload = self.payload('Stop')
+        del payload['turn_id']
+        self.store.hook(payload)
+        self.assertTrue(path.exists())
 
     def test_session_start_skips_active_and_cleans_stale(self):
         stale = self.create(session='stale')

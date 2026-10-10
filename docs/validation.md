@@ -4,7 +4,7 @@ Version: 0.1.0. Research/development date: 2026-10-10.
 
 ## Local evidence
 
-- 61 unittest cases passed on macOS / Python 3.11.4.
+- 62 unittest cases passed on macOS / Python 3.11.4.
 - Separate hook processes exercised SQLite concurrency (six simultaneous posts).
 - Tests exercise preexisting-file preservation, exact call/session identity,
   protected paths, Git trees, links, modified fingerprints, replay/expiry,

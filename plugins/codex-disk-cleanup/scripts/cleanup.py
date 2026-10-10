@@ -21,7 +21,7 @@ RETENTION = {"test": 0, "temp": 7 * 86400, "cron-output": 14 * 86400}
 PROTECTED = {".git", ".codex", ".agents", "sessions", "archived_sessions", "memories",
              "skills", "plugins", "outputs", "deliverables", "node_modules", ".ssh",
              ".quarantine", ".codex-disk-cleanup-quarantine"}
-SECRETS = {"auth.json", "config.toml", "history.jsonl", "AGENTS.md", ".env"}
+SECRETS = {"auth.json", "config.toml", "config.json", "history.jsonl", "AGENTS.md", ".env"}
 MAX_BYTES = 64 * 1024 * 1024
 MAX_ITEMS = 2000
 LEASE = 86400
@@ -199,7 +199,10 @@ class Store:
         parts = p.relative_to(root).parts
         if any(x in PROTECTED or x in SECRETS or x.startswith(".env") for x in parts):
             raise Refused("protected path")
-        if any(p.suffix.lower() == ext for ext in (".sqlite", ".sqlite3", ".db", ".pem", ".key")):
+        extensions = (".sqlite", ".sqlite3", ".db", ".pem", ".key")
+        database_parts = tuple(ext + tail for ext in (".sqlite", ".sqlite3", ".db")
+                               for tail in ("-wal", "-shm", "-journal"))
+        if p.name.lower().endswith(extensions + database_parts):
             raise Refused("protected data type")
         safe_components(p)
         safe_components(root)
@@ -302,6 +305,8 @@ class Store:
             if event == "SessionStart":
                 self.audit("session-start", {"session": session})
         if event in ("Stop", "SessionEnd", "SessionStart"):
+            if event == "Stop" and not isinstance(payload.get("turn_id"), str):
+                return {"ignored": "Stop missing turn_id"}
             plan = self.plan("quick", session=session,
                              turn=payload.get("turn_id") if event == "Stop" else None,
                              stale_only=event == "SessionStart")
