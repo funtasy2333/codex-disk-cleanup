@@ -274,6 +274,18 @@ class CleanupTests(unittest.TestCase):
         self.store.hook(self.payload('PreToolUse', self.root / 'test_second.py', call='running'))
         self.assertEqual(self.store.apply(plan['plan_id'])['quarantined'], [])
 
+    def test_pending_existing_file_tool_prevents_cleanup(self):
+        path = self.create()
+        self.store.hook(self.payload('PreToolUse', path, call='editing'))
+        self.assertEqual(self.plan()['items'], [])
+        self.assertTrue(path.exists())
+
+    def test_pending_pathless_tool_prevents_cleanup(self):
+        path = self.create()
+        self.store.hook(self.payload('PreToolUse', call='running', tool_input={'command': 'sleep 5'}))
+        self.assertEqual(self.plan()['items'], [])
+        self.assertTrue(path.exists())
+
     def test_stop_only_current_turn(self):
         old = self.create(call='old', turn='old')
         new = self.create('test_new.py', call='new')
@@ -462,6 +474,14 @@ class CleanupTests(unittest.TestCase):
                                'quick', '--apply', plan['plan_id']], capture_output=True, text=True)
         self.assertEqual(proc.returncode, 1)
         self.assertIn('--yes', proc.stderr)
+
+    def test_dry_run_rejects_apply(self):
+        path = self.create()
+        plan = self.plan()
+        proc = subprocess.run([sys.executable, str(SCRIPT), '--data', str(self.store.data),
+                               'dry-run', '--apply', plan['plan_id'], '--yes'], capture_output=True, text=True)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertTrue(path.exists())
 
     def test_cli_purge_requires_yes(self):
         path, mid = self.move()

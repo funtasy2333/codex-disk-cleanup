@@ -114,6 +114,7 @@ class Store:
         """)
         row = self.db.execute("SELECT value FROM metadata WHERE key='schema'").fetchone()
         if row and row[0] != "1":
+            self.db.close()
             raise Refused("unsupported state schema")
         self.db.execute("INSERT OR IGNORE INTO metadata VALUES ('schema','1')")
         config_path = self.data / "config.json"
@@ -273,9 +274,10 @@ class Store:
                 paths = self.candidates(payload, root)
                 if event == "PreToolUse":
                     absent = [p for p in paths if not os.path.lexists(p)]
-                    if absent:
-                        self.db.execute("INSERT OR REPLACE INTO pending VALUES (?,?,?,?)",
-                                        (session, call, now, compact(absent)))
+                    # Even a call with no new paths may read/write tracked files.
+                    # Keep a lease for every observed call, not just file creation.
+                    self.db.execute("INSERT OR REPLACE INTO pending VALUES (?,?,?,?)",
+                                    (session, call, now, compact(absent)))
                     return {"observed": len(absent)}
                 row = self.db.execute("SELECT paths FROM pending WHERE session=? AND call=?",
                                       (session, call)).fetchone()
@@ -539,8 +541,9 @@ def parser():
         if name == "dry-run":
             c.add_argument("--scope", choices=("quick", "deep"), default="quick")
         c.add_argument("--session")
-        c.add_argument("--apply", metavar="PLAN_ID")
-        c.add_argument("--yes", action="store_true")
+        if name != "dry-run":
+            c.add_argument("--apply", metavar="PLAN_ID")
+            c.add_argument("--yes", action="store_true")
     for name in ("restore", "purge"):
         c = subs.add_parser(name)
         c.add_argument("id")
@@ -569,6 +572,8 @@ def main(argv=None):
             event = payload.get("hook_event_name")
             if event == "SessionStart":
                 context = ("Codex disk cleanup scratch directory: " + str(store.workspace(payload["session_id"]))
+                           + ". Plugin state directory (pass as --data): " + str(store.data)
+                           + ". Cleanup script: " + str(Path(__file__).resolve())
                            + ". Put disposable intermediates here. Keep deliverables and regression tests in the project. "
                            + "Literal paths can be tracked; outputs and arbitrary shell code are not parsed. "
                            + "Auto mode: " + store.config["auto"] + ". test_* scratch files may be quarantined at Stop.")
@@ -586,7 +591,7 @@ def main(argv=None):
         elif args.command == "status":
             result = store.status()
         elif args.command in ("dry-run", "quick", "deep"):
-            if args.apply:
+            if getattr(args, "apply", None):
                 if not args.yes:
                     raise Refused("--apply requires --yes after reviewing the plan")
                 result = store.apply(args.apply)

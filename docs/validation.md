@@ -4,7 +4,7 @@ Version: 0.1.0. Research/development date: 2026-10-10.
 
 ## Local evidence
 
-- 58 unittest cases passed on macOS / Python 3.11.4.
+- 61 unittest cases passed on macOS / Python 3.11.4.
 - Separate hook processes exercised SQLite concurrency (six simultaneous posts).
 - Tests exercise preexisting-file preservation, exact call/session identity,
   protected paths, Git trees, links, modified fingerprints, replay/expiry,
@@ -13,6 +13,10 @@ Version: 0.1.0. Research/development date: 2026-10-10.
 - Portable/compatibility manifest consistency, hook references, skill presence,
   marketplace path and deterministic package structure are checked by
   `python tools/package.py --check`.
+- Root `plugin.json` passed the Agent Plugins 1.0 JSON Schema.
+- Codex CLI `0.162.0-alpha.17.2` discovered the package at version 0.1.0 via
+  `plugin list --available --json` with a command-local marketplace override.
+  No installation or persistent global configuration change was needed.
 - Tests use isolated temporary fixtures. No real user cache/log/scratch data
   is cleaned during development.
 
@@ -23,6 +27,11 @@ and `windows-latest`, Python 3.10 and 3.13. Current results must be read from
 [GitHub Actions](https://github.com/funtasy2333/codex-disk-cleanup/actions/workflows/ci.yml),
 not inferred from the presence of the workflow file. Symlink tests may skip on
 Windows when the runner cannot create symlinks.
+
+The first CI run exposed an SQLite connection retained when an unsupported
+schema was rejected on Windows/Python 3.13. The rejection now explicitly closes
+the connection. Follow-up changes also guard pathless/in-place pending tools
+and make `dry-run --apply` invalid at the argument parser.
 
 ## Remaining acceptance
 
