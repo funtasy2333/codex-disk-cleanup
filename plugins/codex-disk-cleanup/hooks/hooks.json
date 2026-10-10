@@ -1,0 +1,67 @@
+{
+  "description": "Observe only new files in managed scratch; preview by default.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/scripts/cleanup.py\" hook",
+            "commandWindows": "py -3 \"${PLUGIN_ROOT}/scripts/cleanup.py\" hook",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/scripts/cleanup.py\" hook",
+            "commandWindows": "py -3 \"${PLUGIN_ROOT}/scripts/cleanup.py\" hook",
+            "timeout": 15
+          }
+        ],
+        "matcher": "Bash|apply_patch|Edit|Write|mcp__.*"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/scripts/cleanup.py\" hook",
+            "commandWindows": "py -3 \"${PLUGIN_ROOT}/scripts/cleanup.py\" hook",
+            "timeout": 15
+          }
+        ],
+        "matcher": "Bash|apply_patch|Edit|Write|mcp__.*"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/scripts/cleanup.py\" hook",
+            "commandWindows": "py -3 \"${PLUGIN_ROOT}/scripts/cleanup.py\" hook",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/scripts/cleanup.py\" hook",
+            "commandWindows": "py -3 \"${PLUGIN_ROOT}/scripts/cleanup.py\" hook",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
