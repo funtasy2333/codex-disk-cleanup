@@ -45,14 +45,28 @@ and make `dry-run --apply` invalid at the argument parser.
 
 ## v0.1.1 acceptance
 
-Local tests and package checks passed. Native source-package hook parsing passed.
-Installed hook registry verification and the v0.1.1 CI result will be recorded
-after publishing and upgrading. Trust and dispatch remain distinct checks.
+Runtime commit `02b5ef436ab2bef2e860bff19bfcb44261d93a15` passed all six matrix
+jobs, each with 71 tests and packaging checks:
+[run 38114505816](https://github.com/funtasy2333/codex-disk-cleanup/actions/runs/38114505816).
+
+The user's local CLI `0.162.0-alpha.17.2` was upgraded through supported config
+and plugin commands to pinned v0.1.1. Seven installed package files exactly match
+release source. Native `plugin/read` returns five hooks; native `hooks/list`
+returns all five enabled, each `trustStatus: untrusted`, with no load errors.
+There is one host warning: SessionEnd timeout is clamped from 15 to 3 seconds.
+This host limit is respected; recovery and the next SessionStart handle interrupted
+operations. Native dispatch and actual timeout behavior remain unverified.
+
+Running the installed script's `status` without environment or `--data` resolves
+`CODEX_HOME/plugins/data/codex-disk-cleanup-codex-disk-cleanup-marketplace`, with
+`data_source: codex-installation`, `initialized: false`, `hooks_seen: false`,
+`auto: preview`. No cleanup database was created and no user files were cleaned.
+Trust and native dispatch remain distinct checks.
 
 ## Remaining acceptance
 
 Long-term production reliability is not established by these tests. Desktop
-installation, the user's hook trust review, new-chat context, actual native
+user's hook trust review, new-chat context, actual native
 hook dispatch and Windows desktop behavior need user-environment acceptance.
 Payload fixtures are not proof of dispatch by every host version. No support is
 claimed for cloud-orchestrated Work, network filesystems or hostile concurrent
