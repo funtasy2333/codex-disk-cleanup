@@ -1,4 +1,4 @@
-# Codex Disk Cleanup 0.1.1
+# Codex Disk Cleanup 0.1.2
 
 Local Codex scratch-file lifecycle plugin. Python 3.10+, standard library only.
 Initial testable release; default behavior is preview, not automatic deletion.

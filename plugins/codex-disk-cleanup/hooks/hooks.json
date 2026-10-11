@@ -58,7 +58,7 @@
             "type": "command",
             "command": "python3 \"${PLUGIN_ROOT}/scripts/cleanup.py\" hook",
             "commandWindows": "py -3 \"${PLUGIN_ROOT}/scripts/cleanup.py\" hook",
-            "timeout": 15
+            "timeout": 3
           }
         ]
       }

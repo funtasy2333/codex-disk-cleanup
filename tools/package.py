@@ -21,13 +21,14 @@ def check():
     assert f'VERSION = "{legacy["version"]}"' in script
     hooks = json.loads((PLUGIN / 'hooks/hooks.json').read_text(encoding='utf-8'))['hooks']
     assert set(hooks) == {'SessionStart', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionEnd'}
-    for groups in hooks.values():
+    for event, groups in hooks.items():
         for group in groups:
             for handler in group['hooks']:
                 assert handler['type'] == 'command'
                 assert '${PLUGIN_ROOT}/scripts/cleanup.py' in handler['command']
                 assert '${PLUGIN_ROOT}/scripts/cleanup.py' in handler['commandWindows']
-                assert handler['timeout'] == 15
+                assert handler['timeout'] == (3 if event == 'SessionEnd' else 15), (
+                    'SessionEnd must respect the native 3-second limit')
     assert 'name: disk-cleanup' in (PLUGIN / 'skills/disk-cleanup/SKILL.md').read_text(encoding='utf-8')
     assert (PLUGIN / 'scripts/cleanup.py').is_file()
     assert (PLUGIN / 'LICENSE').is_file()

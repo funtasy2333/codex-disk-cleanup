@@ -16,7 +16,7 @@ import sys
 import time
 import uuid
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 RETENTION = {"test": 0, "temp": 7 * 86400, "cron-output": 14 * 86400}
 PROTECTED = {".git", ".codex", ".agents", "sessions", "archived_sessions", "memories",
              "skills", "plugins", "outputs", "deliverables", "node_modules", ".ssh",

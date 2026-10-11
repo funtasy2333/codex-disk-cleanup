@@ -3,13 +3,13 @@
 [中文](../README.md)
 
 A local Codex plugin for evidence-based scratch-file lifecycle management.
-Python 3.10+, standard library only. Version 0.1.1 fixes native hook registration in the initial release; it is
+Python 3.10+, standard library only. Version 0.1.2 fixes native hook registration and SessionEnd timeout compatibility; it is
 not a claim of long-term production stability.
 
 ## Install
 
 ```sh
-codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.1
+codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.2
 codex plugin add codex-disk-cleanup@codex-disk-cleanup-marketplace
 ```
 

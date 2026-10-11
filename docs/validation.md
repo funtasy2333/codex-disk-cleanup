@@ -1,6 +1,6 @@
 # Validation
 
-Version: 0.1.1. Research/development dates: 2026-10-10–11.
+Version: 0.1.2. Research/development dates: 2026-10-10–11.
 
 ## Local evidence
 
@@ -63,6 +63,13 @@ Running the installed script's `status` without environment or `--data` resolves
 `auto: preview`. No cleanup database was created and no user files were cleaned.
 Trust and native dispatch remain distinct checks.
 
+## v0.1.2 acceptance
+
+SessionEnd now explicitly uses the native 3-second maximum, with the package
+validator enforcing that value. Other Hook timeouts remain 15 seconds.
+Local regression and package checks, CI and installed native registry verification
+are required for this release. Native dispatch remains a separate acceptance step.
+
 ## Remaining acceptance
 
 Long-term production reliability is not established by these tests. Desktop
@@ -70,4 +77,4 @@ user's hook trust review, new-chat context, actual native
 hook dispatch and Windows desktop behavior need user-environment acceptance.
 Payload fixtures are not proof of dispatch by every host version. No support is
 claimed for cloud-orchestrated Work, network filesystems or hostile concurrent
-filesystem mutation. Release 0.1.1 starts in preview mode.
+filesystem mutation. Release 0.1.2 starts in preview mode.
