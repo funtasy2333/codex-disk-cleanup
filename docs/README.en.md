@@ -22,6 +22,11 @@ Hook-bearing plugins currently cannot be submitted to the public OpenAI director
 See [official hooks](https://learn.chatgpt.com/docs/hooks) and
 [packaging guidance](https://developers.openai.com/plugins/build/plugins).
 
+Before upgrading, stop active chats; restart Desktop after updating. The host
+may remove old version caches while an active chat still references their hook
+commands, causing missing-file errors. Restarting loads the new definitions.
+Do not patch installed caches or trust records as a workaround.
+
 ## Usage
 
 `PLUGIN_DIR` is the installed package directory. Run `status` without `--data`

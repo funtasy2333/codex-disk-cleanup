@@ -67,14 +67,35 @@ Trust and native dispatch remain distinct checks.
 
 SessionEnd now explicitly uses the native 3-second maximum, with the package
 validator enforcing that value. Other Hook timeouts remain 15 seconds.
-Local regression and package checks, CI and installed native registry verification
-are required for this release. Native dispatch remains a separate acceptance step.
+Runtime commit `3e6fe380cfc1969d6f8e416bcbf9267707a13279` passed all six CI
+matrix jobs, each running 71 tests and package checks:
+[run 38114858264](https://github.com/funtasy2333/codex-disk-cleanup/actions/runs/38114858264).
+
+After restarting the desktop, CLI discovery confirms installed/enabled v0.1.2,
+the marketplace remains pinned to v0.1.2, and all seven installed files match
+release source. Native `hooks/list` returns all five hooks enabled and trusted,
+with `errors: []` and `warnings: []`; SessionEnd has `timeoutSec: 3`.
+The real resumed conversation received SessionStart's scratch/state context.
+Installed status reports `initialized: true`, `hooks_seen: true`, `auto: preview`,
+with no tracked or quarantined files and no maintenance roots. Hook observation
+alone does not prove all five events or full lifecycle cleanup behavior.
+
+Status in the restricted tool sandbox could not open the existing SQLite WAL
+state. The same read-only command succeeded with host filesystem permission;
+no cleanup or policy change was performed.
+
+Updating the marketplace while this chat was active removed its referenced
+v0.1.1 cache. Its old PreToolUse and Stop commands then failed with missing-file
+errors, interrupting verification and causing repeated Stop prompts. Restarting
+loaded the already-installed v0.1.2 and restored command execution. Future
+upgrades should be done after stopping active chats, then restarting the desktop;
+never modify cached scripts or trust records as a workaround.
 
 ## Remaining acceptance
 
-Long-term production reliability is not established by these tests. Desktop
-user's hook trust review, new-chat context, actual native
-hook dispatch and Windows desktop behavior need user-environment acceptance.
+Long-term production reliability is not established by these tests. Complete
+native lifecycle dispatch, cleanup behavior and Windows desktop behavior still
+need user-environment acceptance.
 Payload fixtures are not proof of dispatch by every host version. No support is
 claimed for cloud-orchestrated Work, network filesystems or hostile concurrent
 filesystem mutation. Release 0.1.2 starts in preview mode.

@@ -37,6 +37,8 @@ codex plugin add codex-disk-cleanup@codex-disk-cleanup-marketplace
 Desktop 可添加该 Git marketplace 后选择安装，或使用 Releases 中的插件 ZIP 按当前客户端支持的本地插件流程导入。
 **安装并不代表 Hooks 已获得信任。** 按客户端显示的 Hook 审阅流程检查命令和脚本，再信任该定义；新版本变更后可能需要重新审阅。本项目不会修改你的全局配置或绕过信任检查。
 
+**升级时先停止活跃聊天，完成版本更新后重启 Desktop。** 当前宿主更新缓存后，已有聊天可能仍引用旧版本脚本，造成工具和 Stop Hook 的缺失文件错误；重启后加载新版定义。不要直接编辑缓存或信任记录。
+
 安装后在新聊天请求“查看 disk-cleanup 状态”。SessionStart 应提供该会话的专用临时目录。永久测试和最终交付仍放在项目中。
 Hook 获得的 `PLUGIN_DATA` 是插件状态目录。普通工具不一定继承该变量；已安装脚本会核验原生缓存路径和清单，并解析该安装实例的数据目录。直接运行 `status` 可查看 `data`、`data_source`、`initialized` 和 `hooks_seen`；未初始化时不会创建数据目录，也不代表 Hooks 已运行。源码独立运行时用自选 `--data`，不能把独立状态误认成安装实例。
 
