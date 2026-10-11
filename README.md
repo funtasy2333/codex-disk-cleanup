@@ -4,7 +4,7 @@
 
 为本地 Codex 构建的临时文件生命周期插件。Python 3.10+，运行时只用标准库。
 
-**0.1.0 是首个可测试版本，尚未经过长期使用验证。** 默认只预览；自动清理需显式启用，清理先移入隔离区，可恢复。永久删除是独立操作。源码、测试、CI 和安装包都在本仓库，GitHub 公开发布不等于已上架 OpenAI 公共插件目录。
+**0.1.1 修复了首版在当前 Codex 中未注册 Hooks 的兼容性问题，尚未经过长期使用验证。** 默认只预览；自动清理需显式启用，清理先移入隔离区，可恢复。永久删除是独立操作。源码、测试、CI 和安装包都在本仓库，GitHub 公开发布不等于已上架 OpenAI 公共插件目录。
 
 [English](docs/README.en.md) · [安全边界](SECURITY.md) · [设计](docs/design.md) · [验收记录](docs/validation.md)
 
@@ -30,7 +30,7 @@
 在支持插件命令的 Codex CLI 中：
 
 ```sh
-codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.0
+codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.1
 codex plugin add codex-disk-cleanup@codex-disk-cleanup-marketplace
 ```
 
@@ -38,17 +38,19 @@ Desktop 可添加该 Git marketplace 后选择安装，或使用 Releases 中的
 **安装并不代表 Hooks 已获得信任。** 按客户端显示的 Hook 审阅流程检查命令和脚本，再信任该定义；新版本变更后可能需要重新审阅。本项目不会修改你的全局配置或绕过信任检查。
 
 安装后在新聊天请求“查看 disk-cleanup 状态”。SessionStart 应提供该会话的专用临时目录。永久测试和最终交付仍放在项目中。
-Hook 获得的 `PLUGIN_DATA` 是插件状态目录；普通工具不一定继承该变量，使用命令时应传入实际状态路径，不能把独立 CLI 状态误认成已安装插件状态。
+Hook 获得的 `PLUGIN_DATA` 是插件状态目录。普通工具不一定继承该变量；已安装脚本会核验原生缓存路径和清单，并解析该安装实例的数据目录。直接运行 `status` 可查看 `data`、`data_source`、`initialized` 和 `hooks_seen`；未初始化时不会创建数据目录，也不代表 Hooks 已运行。源码独立运行时用自选 `--data`，不能把独立状态误认成安装实例。
+
+当前原生加载器跳过根目录 Agent Plugins `plugin.json` 的 Hooks，因此实际分发包仅使用 `.codex-plugin/plugin.json`。Portable 清单保留在 `docs/examples/` 作参考，不进入安装包。见[兼容性证据](docs/provenance.md)。设置 → 钩子中应出现 Codex Disk Cleanup 的五个 Hooks；缺失时刷新列表，并核对是否仍安装 v0.1.0。
 
 当前官方说明：带 Hooks 的插件应手动分发，暂不能提交公共插件目录；云端编排的 Work 不支持本地命令型插件 Hooks，即使工具在本地执行。本地编排和执行的受支持环境可使用。
 参见 [Hooks](https://learn.chatgpt.com/docs/hooks)、[插件包规范](https://developers.openai.com/plugins/build/plugins)、[分发限制](https://developers.openai.com/plugins/guides/submit-claude-plugin)。
 
 ## 命令
 
-下面的 `PLUGIN_DIR` 指实际插件目录，`DATA_DIR` 指该安装实例的实际 `PLUGIN_DATA`。可在相应 Hook 的状态输出或客户端插件信息中核实。源码目录下也可以用自选的专用数据目录运行独立实例。
+下面的 `PLUGIN_DIR` 指实际插件目录。先运行不带 `--data` 的 `status`，确认 `data_source` 为 `codex-installation` 或宿主环境来源，然后把返回的 `data` 作为 `DATA_DIR`。源码目录下可用自选专用数据目录运行独立实例。
 
 ```sh
-python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" status
+python3 "$PLUGIN_DIR/scripts/cleanup.py" status
 python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" dry-run --scope quick
 python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" dry-run --scope deep
 ```

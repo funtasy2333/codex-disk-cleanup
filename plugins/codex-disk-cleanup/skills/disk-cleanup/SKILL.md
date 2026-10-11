@@ -6,9 +6,16 @@ description: Inspect or clean Codex scratch files, preview cache and log mainten
 Use the bundled `scripts/cleanup.py`, resolved two directories above this skill.
 Use `python3` on macOS/Linux and `py -3` on Windows. Pass `--data` with the
 installed plugin's writable `PLUGIN_DATA` directory when that environment
-variable is not inherited by the tool. Do not substitute another state directory
-without explaining that it is a separate standalone instance. If the actual data
-directory is unavailable, report this and ask for its path rather than guessing.
+variable is not inherited by the tool. Run `status` directly from the installed
+script first: it resolves the native host data allocation from the verified
+`plugins/cache/<marketplace>/<name>/<version>` layout and matching legacy
+manifest. `status` is read-only and reports `initialized: false` when Hooks have
+not created state. Do not ask the user for a path when this resolver succeeds.
+Check `data_source`: `codex-installation` is the installed instance; `standalone`
+is a separate CLI instance. For an unusual source layout without environment or
+verified installed identity, report the limitation rather than inventing a path.
+Missing state does not mean cleanup has run successfully. Hooks must appear in
+the native registry and be reviewed/trusted before dispatch can be confirmed.
 
 1. `status` shows policy, tracked files and quarantine IDs.
 2. `dry-run --scope quick` previews tracked disposable files.

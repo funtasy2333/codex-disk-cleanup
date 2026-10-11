@@ -3,13 +3,13 @@
 [中文](../README.md)
 
 A local Codex plugin for evidence-based scratch-file lifecycle management.
-Python 3.10+, standard library only. Version 0.1.0 is an initial testable release,
+Python 3.10+, standard library only. Version 0.1.1 fixes native hook registration in the initial release; it is
 not a claim of long-term production stability.
 
 ## Install
 
 ```sh
-codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.0
+codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.1
 codex plugin add codex-disk-cleanup@codex-disk-cleanup-marketplace
 ```
 
@@ -24,14 +24,22 @@ See [official hooks](https://learn.chatgpt.com/docs/hooks) and
 
 ## Usage
 
-`PLUGIN_DIR` is the installed package directory; `DATA_DIR` must be the actual
-installed instance's `PLUGIN_DATA`. Ordinary tools may not inherit that variable.
-If the installed data path is unknown, obtain it from the client/hook information,
-do not silently use a standalone instance. Source users can choose a dedicated
-`--data` directory for a separate CLI instance.
+`PLUGIN_DIR` is the installed package directory. Run `status` without `--data`
+first: it verifies the native cache layout and matching manifest, then derives
+the host allocation. Check `data_source` and use the returned `data` as `DATA_DIR`.
+Host `PLUGIN_DATA`/`CLAUDE_PLUGIN_DATA` and explicit `--data` take precedence.
+Status does not initialize missing state; `initialized: false` is not evidence
+of hook dispatch. Source users can choose a dedicated `--data` directory for a
+separate CLI instance.
+
+The current native loader skips hooks in root Agent Plugins `plugin.json`
+packages, so the installable package uses only `.codex-plugin/plugin.json`.
+The portable manifest is a documentation example outside the package. After
+installation, Settings → Hooks should list five Codex Disk Cleanup hooks. See
+[verified compatibility evidence](provenance.md).
 
 ```sh
-python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" status
+python3 "$PLUGIN_DIR/scripts/cleanup.py" status
 python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" dry-run --scope quick
 python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" dry-run --scope deep
 python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" quick --apply PLAN_ID --yes

@@ -536,5 +536,94 @@ class CleanupTests(unittest.TestCase):
         self.assertIn('quarantine', actions)
 
 
+class InstallationTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.home = Path(self.tmp.name).resolve()
+        self.codex_home = self.home / '.codex'
+        self.root = self.codex_home / 'plugins/cache/example-marketplace/codex-disk-cleanup/0.1.1'
+        manifest = self.root / '.codex-plugin/plugin.json'
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text(json.dumps({'name': 'codex-disk-cleanup', 'version': '0.1.1'}))
+        self.script = self.root / 'scripts/cleanup.py'
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def resolve(self, env=None):
+        return c.resolve_data(script=self.script, home=self.home, env=env or {})
+
+    def test_native_installation_resolves_host_allocation_without_creating_it(self):
+        data, source = self.resolve()
+        self.assertEqual(source, 'codex-installation')
+        self.assertEqual(data, self.codex_home / 'plugins/data/codex-disk-cleanup-example-marketplace')
+        with contextlib.closing(c.Store(data, read_only=True)) as store:
+            status = store.status()
+            self.assertFalse(status['initialized'])
+            self.assertFalse(status['hooks_seen'])
+            self.assertEqual(status['auto'], 'preview')
+        self.assertFalse(data.exists())
+
+    def test_explicit_and_host_environment_precedence(self):
+        env = {'PLUGIN_DATA': str(self.home / 'host'), 'CLAUDE_PLUGIN_DATA': str(self.home / 'compat')}
+        self.assertEqual(c.resolve_data(self.home / 'explicit', env=env), (self.home / 'explicit', 'explicit'))
+        self.assertEqual(self.resolve(env), (self.home / 'host', 'PLUGIN_DATA'))
+        self.assertEqual(self.resolve({'CLAUDE_PLUGIN_DATA': str(self.home / 'compat')}),
+                         (self.home / 'compat', 'CLAUDE_PLUGIN_DATA'))
+
+    def test_custom_codex_home(self):
+        self.assertEqual(self.resolve({'CODEX_HOME': str(self.codex_home)})[1], 'codex-installation')
+        self.assertEqual(self.resolve({'CODEX_HOME': str(self.home / 'other')})[1], 'standalone')
+
+    def test_mismatched_manifest_refused(self):
+        (self.root / '.codex-plugin/plugin.json').write_text(json.dumps({'name': 'other', 'version': '0.1.1'}))
+        with self.assertRaises(c.Refused):
+            self.resolve()
+
+    def test_portable_manifest_in_native_cache_refused(self):
+        (self.root / 'plugin.json').write_text('{}')
+        with self.assertRaises(c.Refused):
+            self.resolve()
+
+    def test_status_command_does_not_initialize_standalone_state(self):
+        data = self.home / 'uninitialized'
+        proc = subprocess.run([sys.executable, str(SCRIPT), '--data', str(data), 'status'],
+                              capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        status = json.loads(proc.stdout)
+        self.assertFalse(status['initialized'])
+        self.assertEqual(status['data_source'], 'explicit')
+        self.assertFalse(data.exists())
+
+    def test_status_reads_existing_state_without_mutation(self):
+        data = self.home / 'state'
+        with contextlib.closing(c.Store(data)) as store:
+            store.hook({'hook_event_name': 'SessionStart', 'session_id': 'fixture'})
+        before = (data / 'state.sqlite3').read_bytes()
+        with contextlib.closing(c.Store(data, read_only=True)) as store:
+            self.assertTrue(store.status()['initialized'])
+            self.assertTrue(store.status()['hooks_seen'])
+            with self.assertRaises(sqlite3.OperationalError):
+                store.db.execute("DELETE FROM sessions")
+        self.assertEqual((data / 'state.sqlite3').read_bytes(), before)
+
+    def test_read_only_status_rejects_unknown_schema(self):
+        data = self.home / 'state'
+        with contextlib.closing(c.Store(data)) as store:
+            store.db.execute("UPDATE metadata SET value='999' WHERE key='schema'")
+        with self.assertRaises(c.Refused):
+            c.Store(data, read_only=True)
+        # In particular, constructor failure must release the Windows file handle.
+        (data / 'state.sqlite3').unlink()
+
+    def test_package_excludes_portable_example(self):
+        plugin = SCRIPT.parent.parent
+        self.assertFalse((plugin / 'plugin.json').exists())
+        self.assertTrue((plugin / '.codex-plugin/plugin.json').is_file())
+        package_script = SCRIPT.parents[3] / 'tools/package.py'
+        proc = subprocess.run([sys.executable, str(package_script), '--check'], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+
+
 if __name__ == '__main__':
     unittest.main()

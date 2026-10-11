@@ -11,13 +11,14 @@ PLUGIN = ROOT / 'plugins/codex-disk-cleanup'
 
 
 def check():
-    portable = json.loads((PLUGIN / 'plugin.json').read_text(encoding='utf-8'))
     legacy = json.loads((PLUGIN / '.codex-plugin/plugin.json').read_text(encoding='utf-8'))
-    assert portable['name'] == legacy['name'] == PLUGIN.name
-    assert portable['version'] == legacy['version']
-    assert re.fullmatch(r'\d+\.\d+\.\d+', portable['version'])
-    assert len(portable['extensions']['com.openai']['interface']['shortDescription']) <= 30
-    assert portable['extensions']['com.openai']['hooks'] == legacy['hooks'] == './hooks/hooks.json'
+    assert not (PLUGIN / 'plugin.json').exists(), 'Native loader skips hooks for AgentPlugin format'
+    assert legacy['name'] == PLUGIN.name
+    assert re.fullmatch(r'\d+\.\d+\.\d+', legacy['version'])
+    assert len(legacy['interface']['shortDescription']) <= 30
+    assert legacy['hooks'] == './hooks/hooks.json'
+    script = (PLUGIN / 'scripts/cleanup.py').read_text(encoding='utf-8')
+    assert f'VERSION = "{legacy["version"]}"' in script
     hooks = json.loads((PLUGIN / 'hooks/hooks.json').read_text(encoding='utf-8'))['hooks']
     assert set(hooks) == {'SessionStart', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionEnd'}
     for groups in hooks.values():
@@ -32,7 +33,7 @@ def check():
     assert (PLUGIN / 'LICENSE').is_file()
     marketplace = json.loads((ROOT / '.agents/plugins/marketplace.json').read_text(encoding='utf-8'))
     assert (ROOT / marketplace['plugins'][0]['source']['path']).resolve() == PLUGIN
-    return portable['version']
+    return legacy['version']
 
 
 def main():
@@ -55,6 +56,7 @@ def main():
             info = zipfile.ZipInfo('codex-disk-cleanup/' + path.relative_to(PLUGIN).as_posix(),
                                    date_time=(2026, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
             info.external_attr = 0o100644 << 16
             archive.writestr(info, path.read_bytes())
     print(target)

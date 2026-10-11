@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.1 — 2026-10-11
+
+- Fix native hook registration: distribute only the Codex legacy manifest;
+  move the root portable manifest to a documentation example outside the package.
+- Resolve the installed data allocation from verified native cache identity when
+  ordinary tools do not inherit `PLUGIN_DATA`.
+- Make status read-only and expose initialization and observed hook state.
+- Add nine regression cases for packaging, identity, state resolution and status.
+- Normalize ZIP platform metadata for reproducible cross-platform packages.
+
 ## 0.1.0 — 2026-10-10
 
 Initial testable local plugin release.

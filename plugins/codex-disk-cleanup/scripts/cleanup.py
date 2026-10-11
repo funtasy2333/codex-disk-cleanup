@@ -16,7 +16,7 @@ import sys
 import time
 import uuid
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 RETENTION = {"test": 0, "temp": 7 * 86400, "cron-output": 14 * 86400}
 PROTECTED = {".git", ".codex", ".agents", "sessions", "archived_sessions", "memories",
              "skills", "plugins", "outputs", "deliverables", "node_modules", ".ssh",
@@ -81,23 +81,55 @@ def same_content(a, b):
 
 
 class Store:
-    def __init__(self, data: Path):
+    def __init__(self, data: Path, *, read_only=False):
         # Resolve OS aliases (e.g. /tmp on macOS) once; descendants stay lexical.
         self.data = data.expanduser().resolve()
-        self.data.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if not read_only:
+            self.data.mkdir(parents=True, exist_ok=True, mode=0o700)
         safe_components(self.data)
         if self.data == Path.home().resolve() or self.data == Path(self.data.anchor):
             raise Refused("unsafe data directory")
         self.scratch = self.data / "scratch"
-        self.scratch.mkdir(exist_ok=True, mode=0o700)
+        if not read_only:
+            self.scratch.mkdir(exist_ok=True, mode=0o700)
         safe_components(self.scratch)
         for name in ("state.sqlite3", "config.json"):
             if os.path.lexists(self.data / name):
                 s = (self.data / name).lstat()
                 if not stat.S_ISREG(s.st_mode) or s.st_nlink != 1:
                     raise Refused("unsafe state/config file")
-        self.db = sqlite3.connect(self.data / "state.sqlite3", timeout=3, isolation_level=None)
+        config_path = self.data / "config.json"
+        if config_path.exists():
+            self.config = json.loads(config_path.read_text(encoding="utf-8"))
+        else:
+            self.config = {"schema": 1, "auto": "preview", "maintenance": []}
+        if not isinstance(self.config, dict) or self.config.get("schema") != 1:
+            raise Refused("invalid config schema")
+        if self.config.get("auto") not in ("preview", "quarantine"):
+            raise Refused("auto must be preview or quarantine")
+        if not isinstance(self.config.get("maintenance"), list):
+            raise Refused("invalid maintenance roots")
+        self.roots = [self.validate_root(spec) for spec in self.config["maintenance"]]
+        self.db = None
+        db_path = self.data / "state.sqlite3"
+        if read_only and not db_path.exists():
+            return
+        if read_only:
+            self.db = sqlite3.connect(db_path.as_uri() + "?mode=ro", uri=True,
+                                      timeout=3, isolation_level=None)
+        else:
+            self.db = sqlite3.connect(db_path, timeout=3, isolation_level=None)
         self.db.row_factory = sqlite3.Row
+        if read_only:
+            try:
+                self.db.execute("PRAGMA query_only=ON")
+                row = self.db.execute("SELECT value FROM metadata WHERE key='schema'").fetchone()
+                if not row or row[0] != "1":
+                    raise Refused("unsupported state schema")
+            except BaseException:
+                self.db.close()
+                raise
+            return
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=FULL")
         self.db.executescript("""
@@ -117,23 +149,10 @@ class Store:
             self.db.close()
             raise Refused("unsupported state schema")
         self.db.execute("INSERT OR IGNORE INTO metadata VALUES ('schema','1')")
-        config_path = self.data / "config.json"
-        if config_path.exists():
-            self.config = json.loads(config_path.read_text(encoding="utf-8"))
-        else:
-            self.config = {"schema": 1, "auto": "preview", "maintenance": []}
-        if not isinstance(self.config, dict) or self.config.get("schema") != 1:
-            raise Refused("invalid config schema")
-        if self.config.get("auto") not in ("preview", "quarantine"):
-            raise Refused("auto must be preview or quarantine")
-        if not isinstance(self.config.get("maintenance"), list):
-            raise Refused("invalid maintenance roots")
-        self.roots = []
-        for spec in self.config["maintenance"]:
-            self.roots.append(self.validate_root(spec))
 
     def close(self):
-        self.db.close()
+        if self.db:
+            self.db.close()
 
     @contextlib.contextmanager
     def transaction(self):
@@ -522,12 +541,51 @@ class Store:
         return {"recovered": results}
 
     def status(self):
-        return {"version": VERSION, "data": str(self.data), "auto": self.config["auto"],
+        result = {"version": VERSION, "data": str(self.data), "auto": self.config["auto"],
+                  "initialized": self.db is not None, "hooks_seen": False,
+                  "maintenance": self.roots, "tracked": [], "quarantine": [], "pending": 0}
+        if self.db is None:
+            result["note"] = "State has not been initialized. Hook trust/dispatch has not been verified."
+            return result
+        result.update({"hooks_seen": bool(self.db.execute("SELECT 1 FROM sessions LIMIT 1").fetchone()),
                 "maintenance": self.roots,
                 "tracked": [dict(r) for r in self.db.execute("SELECT path,session,category,created FROM tracked")],
                 "quarantine": [dict(r) for r in self.db.execute("SELECT id,source,state,created FROM moves "
                                                                 "WHERE state NOT IN ('purged','restored','cancelled')")],
-                "pending": self.db.execute("SELECT count(*) FROM pending").fetchone()[0]}
+                "pending": self.db.execute("SELECT count(*) FROM pending").fetchone()[0]})
+        return result
+
+
+def resolve_data(explicit=None, *, script=None, env=None, home=None):
+    """Resolve host allocation from verified legacy cache layout, never glob/guess."""
+    env = os.environ if env is None else env
+    if explicit is not None:
+        return Path(explicit), "explicit"
+    for name in ("PLUGIN_DATA", "CLAUDE_PLUGIN_DATA"):
+        if env.get(name):
+            return Path(env[name]), name
+    home = Path.home() if home is None else Path(home)
+    codex_home = Path(env.get("CODEX_HOME", str(home / ".codex"))).expanduser().resolve()
+    script = Path(__file__) if script is None else Path(script)
+    root = script.resolve().parent.parent
+    try:
+        parts = root.relative_to(codex_home / "plugins" / "cache").parts
+    except ValueError:
+        parts = ()
+    if len(parts) == 3:
+        marketplace, name, version = parts
+        manifest = root / ".codex-plugin" / "plugin.json"
+        # Native loader currently skips Hooks for root Agent Plugins manifests.
+        if name != "codex-disk-cleanup" or not re.fullmatch(r"[a-zA-Z0-9_.-]+", marketplace):
+            raise Refused("unexpected installed plugin identity")
+        if not manifest.is_file() or (root / "plugin.json").exists():
+            raise Refused("cannot verify native hook package layout")
+        identity = json.loads(manifest.read_text(encoding="utf-8"))
+        if identity.get("name") != name or identity.get("version") != version:
+            raise Refused("installed manifest identity does not match cache path")
+        # Mirrors Codex PluginStore::plugin_data_root, verified in native source.
+        return codex_home / "plugins" / "data" / (name + "-" + marketplace), "codex-installation"
+    return home / ".local" / "share" / "codex-disk-cleanup", "standalone"
 
 
 def parser():
@@ -562,10 +620,10 @@ def parser():
 def main(argv=None):
     args = parser().parse_args(argv)
     is_hook = args.command == "hook"
-    data = args.data or Path(os.environ.get("PLUGIN_DATA", str(Path.home() / ".local/share/codex-disk-cleanup")))
     store = None
     try:
-        store = Store(data)
+        data, data_source = resolve_data(args.data)
+        store = Store(data, read_only=args.command == "status")
         if is_hook:
             raw = sys.stdin.buffer.read(1024 * 1024 + 1)
             if len(raw) > 1024 * 1024:
@@ -595,6 +653,7 @@ def main(argv=None):
             result = {"workspace": str(store.workspace(args.session))}
         elif args.command == "status":
             result = store.status()
+            result["data_source"] = data_source
         elif args.command in ("dry-run", "quick", "deep"):
             if getattr(args, "apply", None):
                 if not args.yes:

@@ -1,9 +1,11 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "codex-disk-cleanup",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Evidence-based temporary file lifecycle management with reversible cleanup for local Codex.",
-  "author": {"name": "funtasy2333"},
+  "author": {
+    "name": "funtasy2333"
+  },
   "license": "MIT",
   "extensions": {
     "com.openai": {
@@ -14,7 +16,10 @@
         "longDescription": "Track new scratch files, preview cleanup, quarantine and restore files. Cache and log maintenance is opt-in.",
         "developerName": "funtasy2333",
         "category": "Productivity",
-        "capabilities": ["Read", "Write"],
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
         "websiteURL": "https://github.com/funtasy2333/codex-disk-cleanup",
         "defaultPrompt": "Show disk-cleanup status and preview eligible files."
       }
