@@ -5,7 +5,7 @@ the Codex adapter and storage engine are independently implemented.
 
 ```mermaid
 flowchart LR
-  A[PreToolUse: literal scratch path absent] --> B[SQLite pending record]
+  A[PreToolUse: literal absence + bounded root snapshots] --> B[SQLite pending record]
   B --> C[PostToolUse: same session and call]
   C --> D[Regular file + protected-path check + fingerprint]
   D --> E[Tracked file]
@@ -21,10 +21,23 @@ flowchart LR
 ```
 
 Each session gets a SHA-256-derived scratch directory. IDs are not interpreted
-as path components. Tool arguments must name literal paths within that directory.
+as path components. Literal arguments can name paths within that directory.
 The adapter handles direct `path`, `file_path`, `filename`, shell literal tokens,
 quoted literal paths, and `apply_patch` Add/Update headers. It ignores output and
-does not evaluate source code, variables or command substitution.
+does not evaluate source code, variables or command substitution. In 0.1.4,
+matching tool calls also compare bounded existence snapshots inside managed
+roots. Only paths absent before and present after enter fingerprint validation.
+Existing device/inode identities prevent renamed or relocated old files from
+being adopted. An explicit project enrollment binds a dedicated descendant directory to one
+session, device/inode and retention policy; existing files are never adopted.
+All snapshots share a 2000-entry per-phase budget. Errors and cross-turn/legacy
+pending ambiguity disable dynamic coverage instead of broadening it.
+
+Project enrollments are optional schema-1 configuration. Pending JSON supports
+both old literal lists and new snapshot evidence, so no SQL migration is needed.
+Project policy is included in plans and revalidated for moves; root identity is
+also checked for restore/purge. Withdrawal keeps files and tracking records while
+revoking plan authorization. Default preview and all existing protections remain.
 
 SQLite uses WAL, FULL synchronous writes and `BEGIN IMMEDIATE` for state changes.
 Pending records key on `(session_id, tool_use_id)`. The database records schema

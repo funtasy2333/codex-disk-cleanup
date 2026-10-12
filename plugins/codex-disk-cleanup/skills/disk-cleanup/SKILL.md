@@ -43,8 +43,9 @@ Preview-mode lifecycle plans also show pending candidates; quarantine-mode plans
 skip them with a reason. Neither mode relaxes session, turn or retention filters.
 
 Put disposable intermediate files in the scratch path supplied by SessionStart.
-Use literal file paths in tool arguments. Hooks do not inspect command outputs
-or evaluate embedded code. Keep final deliverables and permanent tests in the
+Prefer literal paths in tool arguments. Matching Hooks also compare bounded
+directory snapshots inside managed roots, so dynamic paths can be tracked
+without inspecting command outputs or evaluating code. Keep final deliverables and permanent tests in the
 user's workspace. `test_*` scratch files have zero retention and can be moved at
 Stop when auto quarantine has explicitly been enabled. Other temporary files
 retain seven days; `cron-output/` retains fourteen days.
@@ -54,3 +55,29 @@ skills, plugins, SQLite files, Git trees or general browser/package caches.
 Do not enable automatic mode, add maintenance roots, or bypass host hook trust
 as a side effect of a status/preview request. Installation does not enable auto
 quarantine; the default is preview.
+
+
+Before a file-producing task, choose locations by purpose. Put disposable scripts,
+crops, render verification images, reference contact sheets and staging copies in
+the injected scratch. Keep final outputs, reusable/editable source assets, source
+prompts, regression tests and audit evidence in the project. A source attempt
+explicitly retained for audit is not disposable solely because it is superseded.
+
+Project scratch is opt-in. Only after the user identifies a dedicated existing
+subdirectory may you run enroll --project ABS_PROJECT --root ABS_ROOT
+--session ACTUAL_SESSION_ID --days DAYS --yes. Do not infer authorization to
+enroll a whole project or mixed production directory from a generic cleanup
+request. Default retention is seven days; --days 0 requires the user's intent
+to make newly observed files immediately eligible. Enrollment never adopts
+old files or changes auto mode. Git trees remain protected; use external
+scratch for Git projects. Unenroll --root ABS_ROOT --yes withdraws the policy
+without moving files; old plans lose authorization.
+
+Status reports project_scratch and project_scratch_errors. Each enrollment binds
+a root identity to one session; changed/missing roots fail closed and remain
+removable via unenroll. Matching Pre/Post snapshots cover at most 2000 combined
+entries per phase. Overflow, access failures, overlapping turns or legacy pending
+calls disable dynamic coverage and record coverage-skipped; literal creation
+evidence remains usable. Do not describe all creations as tracked without
+checking status. Existing project files can be listed as review candidates, but
+never retroactively manufacture Hook tracking records for them.

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.4 — Unreleased (2026-10-12)
+
+- Add explicit per-session enrollment of dedicated project scratch directories,
+  with root identity, retention and overlap checks; withdrawal invalidates plans.
+- Observe dynamic Python/shell file paths through bounded pre/post directory
+  snapshots in managed roots. Existing files are not adopted; unsafe/ambiguous
+  or over-budget snapshots fail closed and report coverage-skipped.
+- Keep schema 1 and read legacy pending lists. Preview, pending guards, path and
+  fingerprint checks, quarantine/restore and explicit purge remain in force.
+- Improve SessionStart file-location guidance and root/status diagnostics.
+- Add 34 isolated project-root, dynamic subprocess and safety regressions. Native
+  acceptance and cross-platform CI of 0.1.4 remain outstanding.
+
 ## 0.1.3 — 2026-10-12
 
 - Fix manual previews omitting a tracked file when the preview command itself

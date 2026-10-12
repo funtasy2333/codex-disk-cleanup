@@ -7,8 +7,12 @@ protect the data directory using OS permissions and do not commit it.
 
 ## Enforced protections
 
-- Only per-session managed scratch paths can be automatically tracked. The exact
-  session and call must observe absence before creation; no output-based discovery.
+- Only builtin per-session scratch and explicitly enrolled, session-bound project
+  scratch can be tracked. Matching pre/post calls observe new paths using literal
+  arguments or bounded directory snapshots; there is no output-based discovery.
+  Enrollment does not adopt existing files or change auto mode. A project root
+  must remain a dedicated strict subdirectory with the enrolled device/inode.
+  Withdrawal invalidates plans; project retention overrides filename categories.
 - Maintenance requires explicit paths inside `CODEX_HOME/cache` or `CODEX_HOME/logs`.
   It never runs automatically. Current policy must still match a preview.
 - Git trees, secrets/control files, sessions, memories, skills, plugins,
@@ -20,7 +24,9 @@ protect the data directory using OS permissions and do not commit it.
   to quarantine. Permanent deletion requires a selected quarantine ID and `--yes`.
 - SQLite transactions serialize state mutations. Durable move/restore/purge
   intents can be reconciled with `recover`. Ambiguity never triggers deletion.
-- Hook errors skip cleanup and allow the user's original task to continue.
+- Runtime-handled errors skip cleanup. Missing installed Hook scripts or native
+  host timeouts can still block tool dispatch; upgrade after stopping active
+  chats and restart instead of editing installed caches or trust records.
 
 ## Threat model and limits
 
@@ -40,7 +46,8 @@ another process independently creating the exact same path.
 
 POSIX allows moving open files; this plugin cannot prove that an old log/cache
 file is unused by an unrelated application. Close writers before manual deep
-maintenance. File size (64 MiB), scan size (2000 files) and hook timeout (15 s)
+maintenance. File size (64 MiB), snapshot budget (2000 combined entries per
+phase, across at most 16 project roots) and hook timeout (15 s)
 bound normal work, but hooks are advisory, and a timeout can leave an intent
 requiring `recover`. Unsupported paths are skipped, not broadened automatically.
 

@@ -91,6 +91,44 @@ sessions. For unusually long-running jobs, keep preview mode enabled.
 Dynamic shell/code paths and outputs are not evaluated. Deliverables and
 permanent tests belong in the project, not scratch.
 
+## 0.1.4 source candidate: project scratch and dynamic paths
+
+Published/installed 0.1.3 remains unchanged. Candidate 0.1.4 is not yet released
+or accepted for native dispatch. Plan locations before writing: disposable
+scripts, crops, render checks, reference contact sheets and staging copies go
+to scratch; final files, reusable source assets, source prompts and audit
+evidence stay in the project. Superseded attempts retained as audit evidence
+are not disposable solely because their names say draft.
+
+Matching pre/post calls compare bounded existence snapshots inside authorized
+roots, capturing variable Python/shell paths without evaluating code or output.
+All roots share a 2000-entry budget per phase. Overflow, access failures,
+overlapping turns and legacy pending calls disable dynamic snapshots, retain
+literal evidence and record coverage-skipped. No post without a matching pre
+can adopt files. Host generated-image source caches stay outside this scope.
+
+Explicitly enroll an existing dedicated subdirectory for one actual session:
+
+```sh
+python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" enroll \
+  --project /absolute/project --root /absolute/project/.tmp/session-id \
+  --session ACTUAL_SESSION_ID --days 7 --yes
+python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" unenroll \
+  --root /absolute/project/.tmp/session-id --yes
+```
+
+Enrollment binds device/inode and session; at most 16 nonoverlapping roots are
+allowed. Existing files and auto mode are unchanged. Project retention overrides
+filename categories; default is seven days, explicit --days 0 makes new files
+immediately eligible subject to pending guards. Withdrawal moves no files and
+invalidates old plans. Status exposes project_scratch and project_scratch_errors;
+missing/changed roots can still be withdrawn. Never enroll an entire project or
+a mixed delivery/audit directory. Git trees, protected paths, home/Codex data,
+links and hardlinks stay protected; Git projects use external plugin scratch.
+Quarantine, restore and explicit purge keep their confirmation/identity checks.
+Historical files may be listed for review but never receive fabricated tracking
+records. Default remains preview.
+
 ## Maintenance
 
 Edit the actual data directory's `config.json` to explicitly enroll existing

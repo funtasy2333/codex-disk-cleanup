@@ -16,7 +16,7 @@ import sys
 import time
 import uuid
 
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 RETENTION = {"test": 0, "temp": 7 * 86400, "cron-output": 14 * 86400}
 PROTECTED = {".git", ".codex", ".agents", "sessions", "archived_sessions", "memories",
              "skills", "plugins", "outputs", "deliverables", "node_modules", ".ssh",
@@ -110,6 +110,20 @@ class Store:
         if not isinstance(self.config.get("maintenance"), list):
             raise Refused("invalid maintenance roots")
         self.roots = [self.validate_root(spec) for spec in self.config["maintenance"]]
+        specs = self.config.get("project_scratch", [])
+        if not isinstance(specs, list) or len(specs) > 16:
+            raise Refused("project_scratch must be a list of at most 16 enrolled roots")
+        self.project_roots, self.project_errors = [], []
+        for spec in specs:
+            try:
+                valid = self.validate_project_root(spec)
+                if any(Path(valid["path"]).is_relative_to(Path(s["path"])) or
+                       Path(s["path"]).is_relative_to(Path(valid["path"])) for s in self.project_roots):
+                    raise Refused("overlapping project scratch roots")
+                self.project_roots.append(valid)
+            except (ValueError, OSError) as e:
+                self.project_errors.append({"path": spec.get("path") if isinstance(spec, dict) else None,
+                                            "reason": str(e)})
         self.db = None
         db_path = self.data / "state.sqlite3"
         if read_only and not db_path.exists():
@@ -201,6 +215,107 @@ class Store:
         finally:
             tmp.unlink(missing_ok=True)
 
+    def validate_project_root(self, spec, *, capture_identity=False):
+        if not isinstance(spec, dict):
+            raise Refused("project scratch policy must be an object")
+        for key in ("path", "project", "session"):
+            if not isinstance(spec.get(key), str) or not spec[key]:
+                raise Refused("project scratch requires path, project and session")
+        if len(spec["session"]) > 512:
+            raise Refused("valid session id required")
+        if not Path(spec["path"]).is_absolute() or not Path(spec["project"]).is_absolute():
+            raise Refused("project and scratch paths must be absolute")
+        safe_components(Path(spec["path"]))
+        safe_components(Path(spec["project"]))
+        root = Path(spec["path"]).resolve(strict=True)
+        project = Path(spec["project"]).resolve(strict=True)
+        if not root.is_dir() or not project.is_dir() or root == project or not root.is_relative_to(project):
+            raise Refused("scratch must be an existing strict subdirectory of the project")
+        home = Path.home().resolve()
+        codex_home = Path(os.environ.get("CODEX_HOME", str(home / ".codex"))).resolve()
+        if project in (home, Path(project.anchor)) or root.is_relative_to(codex_home):
+            raise Refused("home and Codex data are protected")
+        sensitive = {".ssh", ".codex", ".agents", "sessions", "archived_sessions",
+                     "memories", "skills", "plugins"}
+        if any(p in sensitive for p in project.parts):
+            raise Refused("sensitive project ancestor is protected")
+        if root.is_relative_to(self.data) or self.data.is_relative_to(root):
+            raise Refused("project scratch and plugin data overlap")
+        if any(p in PROTECTED or p in SECRETS or p.startswith(".env") for p in root.relative_to(project).parts):
+            raise Refused("protected project path")
+        days = spec.get("days", 7)
+        if type(days) is not int or not 0 <= days <= 3650:
+            raise Refused("project retention must be 0..3650 days")
+        identity = root.stat()
+        if not capture_identity and (spec.get("dev"), spec.get("ino")) != (identity.st_dev, identity.st_ino):
+            raise Refused("enrolled root identity changed or missing")
+        return {"path": str(root), "project": str(project), "session": spec["session"],
+                "days": days, "dev": identity.st_dev, "ino": identity.st_ino}
+
+    def enroll(self, project, root, session, days):
+        spec = self.validate_project_root({"project": str(project), "path": str(root),
+                                          "session": session, "days": days}, capture_identity=True)
+        existing = self.config.get("project_scratch", [])
+        if len(existing) >= 16:
+            raise Refused("project scratch root limit reached")
+        for old in existing:
+            if not isinstance(old, dict) or not isinstance(old.get("path"), str):
+                raise Refused("invalid enrollment; remove it before adding roots")
+            p = Path(old["path"])
+            if p.is_relative_to(Path(spec["path"])) or Path(spec["path"]).is_relative_to(p):
+                raise Refused("root already enrolled or overlaps another enrollment")
+        # Enrollment authorizes future observed creations, never adopts existing files.
+        self.config["project_scratch"] = [*existing, spec]
+        self.save_config()
+        self.project_roots.append(spec)
+        self.audit("enroll", spec)
+        return {"enrolled": spec, "note": "Existing files are not adopted. Auto mode is unchanged."}
+
+    def unenroll(self, root):
+        path = str(root.expanduser().resolve())
+        existing = self.config.get("project_scratch", [])
+        remaining = [s for s in existing if not isinstance(s, dict) or s.get("path") != path]
+        if len(remaining) == len(existing):
+            raise Refused("root is not enrolled")
+        self.config["project_scratch"] = remaining
+        self.save_config()
+        self.project_roots = [s for s in self.project_roots if s["path"] != path]
+        self.audit("unenroll", {"path": path})
+        return {"unenrolled": path, "note": "Files and tracking records are retained; old plans lose authorization."}
+
+    def managed_roots(self, session):
+        return [(self.workspace(session), None), *[(Path(s["path"]), s) for s in self.project_roots
+                                                   if s["session"] == session]]
+
+    def snapshot(self, root, *, budget=None):
+        """Bounded existence evidence inside an authorized root; never parse code/output."""
+        safe_components(root)
+        identity = root.stat()
+        entries, identities, visited, stack = [], {}, 0, [root]
+        limit = MAX_ITEMS if budget is None else budget
+        while stack:
+            base = stack.pop()
+            if base != root:
+                self.candidate(base, root)
+            with os.scandir(base) as iterator:
+                for entry in iterator:
+                    visited += 1
+                    if visited > limit:
+                        raise Refused("scratch snapshot exceeds 2000 entries; use a smaller dedicated directory")
+                    p = Path(entry.path)
+                    try:
+                        self.candidate(p, root)
+                    except (ValueError, OSError):
+                        continue
+                    if entry.is_dir(follow_symlinks=False):
+                        stack.append(p)
+                    else:
+                        entries.append(str(p))
+                        existing = entry.stat(follow_symlinks=False)
+                        identities[str(p)] = [existing.st_dev, existing.st_ino]
+        return {"root": str(root), "dev": identity.st_dev, "ino": identity.st_ino,
+                "entries": sorted(entries), "identities": identities, "visited": visited}
+
     def workspace(self, session):
         if not isinstance(session, str) or not session or len(session) > 512:
             raise Refused("valid session id required")
@@ -229,8 +344,13 @@ class Store:
 
     def root_for(self, item):
         if item["kind"] == "tracked":
-            # Derive rather than trusting stored root/category strings.
-            return self.workspace(item["session"])
+            if item.get("project_policy") is None:
+                return self.workspace(item["session"])
+            for spec in self.project_roots:
+                if spec == item["project_policy"] and spec["session"] == item["session"]:
+                    self.validate_project_root(spec)
+                    return Path(spec["path"])
+            raise Refused("project scratch policy changed or root is no longer enrolled")
         for spec in self.roots:
             if spec == item.get("policy"):
                 self.validate_root(spec)
@@ -293,25 +413,104 @@ class Store:
                 call = payload.get("tool_use_id")
                 if not isinstance(call, str) or not call:
                     return {"ignored": "missing tool_use_id"}
-                paths = self.candidates(payload, root)
+                roots = self.managed_roots(session)
+                paths = sorted({p for managed, _ in roots for p in self.candidates(payload, managed)})[:MAX_ITEMS]
                 if event == "PreToolUse":
                     absent = [p for p in paths if not os.path.lexists(p)]
+                    literal_identities = []
+                    for p in paths:
+                        try:
+                            existing = Path(p).lstat()
+                            if stat.S_ISREG(existing.st_mode):
+                                literal_identities.append([existing.st_dev, existing.st_ino])
+                        except OSError:
+                            pass
+                    snapshots = []
+                    turn = payload.get("turn_id")
+                    ambiguous = False
+                    for pending in self.db.execute("SELECT call,paths FROM pending WHERE session=? AND created>?",
+                                                   (session, now - LEASE)).fetchall():
+                        prior = json.loads(pending["paths"])
+                        if not isinstance(prior, dict) or prior.get("turn") != turn:
+                            ambiguous = True
+                            if isinstance(prior, dict):
+                                prior["snapshots"] = []
+                                self.db.execute("UPDATE pending SET paths=? WHERE session=? AND call=?",
+                                                (compact(prior), session, pending["call"]))
+                    if ambiguous:
+                        self.audit("coverage-skipped", {"session": session,
+                            "reason": "overlapping turn or legacy pending tool; literal tracking only"})
+                    budget = MAX_ITEMS
+                    for managed, policy in ([] if ambiguous else roots):
+                        if budget <= 0:
+                            self.audit("coverage-skipped", {"session": session, "root": str(managed),
+                                                            "reason": "snapshot budget exhausted"})
+                            continue
+                        try:
+                            snap = self.snapshot(managed, budget=budget)
+                            budget -= snap["visited"]
+                            snap["policy"] = policy
+                            snapshots.append(snap)
+                        except (ValueError, OSError) as e:
+                            budget = 0
+                            self.audit("coverage-skipped", {"session": session, "root": str(managed),
+                                                            "reason": str(e)})
                     # Even a call with no new paths may read/write tracked files.
                     # Keep a lease for every observed call, not just file creation.
                     self.db.execute("INSERT OR REPLACE INTO pending VALUES (?,?,?,?)",
-                                    (session, call, now, compact(absent)))
+                                    (session, call, now, compact({"absent": absent, "snapshots": snapshots,
+                                                                 "turn": turn,
+                                                                 "literal_identities": literal_identities})))
                     return {"observed": len(absent)}
                 row = self.db.execute("SELECT paths FROM pending WHERE session=? AND call=?",
                                       (session, call)).fetchone()
                 self.db.execute("DELETE FROM pending WHERE session=? AND call=?", (session, call))
                 count = 0
                 if row:
-                    for name in set(json.loads(row[0])).intersection(paths):
+                    evidence = json.loads(row[0])
+                    # Schema-1 pending records from previous versions remain readable.
+                    absent = evidence if isinstance(evidence, list) else evidence["absent"]
+                    found = set(absent).intersection(paths)
+                    known_identities = set()
+                    if isinstance(evidence, dict):
+                        known_identities = {tuple(identity) for snap in evidence.get("snapshots", [])
+                                            for identity in snap.get("identities", {}).values()}
+                        known_identities.update(tuple(identity) for identity in evidence.get("literal_identities", []))
+                        budget = MAX_ITEMS
+                        for snap in evidence.get("snapshots", []):
+                            managed = next((r for r, policy in roots if str(r) == snap["root"]
+                                            and policy == snap.get("policy")), None)
+                            if managed is None:
+                                continue
+                            if budget <= 0:
+                                self.audit("coverage-skipped", {"session": session, "root": str(managed),
+                                                                "reason": "snapshot budget exhausted"})
+                                continue
+                            try:
+                                after = self.snapshot(managed, budget=budget)
+                                budget -= after["visited"]
+                                if (after["dev"], after["ino"]) != (snap["dev"], snap["ino"]):
+                                    raise Refused("scratch root changed during tool call")
+                                found.update(set(after["entries"]) - set(snap["entries"]))
+                            except (ValueError, OSError) as e:
+                                budget = 0
+                                self.audit("coverage-skipped", {"session": session, "root": str(managed),
+                                                                "reason": str(e)})
+                    for name in sorted(found)[:MAX_ITEMS]:
                         try:
-                            p = self.candidate(Path(name), root)
+                            managed, policy = next((r, s) for r, s in roots
+                                                   if Path(name) != r and Path(name).is_relative_to(r))
+                            if policy is not None:
+                                self.validate_project_root(policy)
+                            p = self.candidate(Path(name), managed)
+                            existing = p.lstat()
+                            if (existing.st_dev, existing.st_ino) in known_identities:
+                                continue
                             fp = fingerprint(p)
+                            if (fp["dev"], fp["ino"]) in known_identities:
+                                continue  # Renaming an existing file is not new ownership.
                             category = "test" if p.name.startswith(("test_", "tmp_test_")) else "temp"
-                            if "cron-output" in p.relative_to(root).parts:
+                            if "cron-output" in p.relative_to(managed).parts:
                                 category = "cron-output"
                             self.db.execute("INSERT OR IGNORE INTO tracked VALUES (?,?,?,?,?,?)",
                                             (str(p), session, str(payload.get("turn_id", "")),
@@ -359,7 +558,10 @@ class Store:
                     continue
                 if turn is not None and r["turn"] != turn:
                     continue
-                if r["category"] not in RETENTION or now - r["created"] < RETENTION[r["category"]]:
+                project_policy = next((s for s in self.project_roots if s["session"] == r["session"]
+                                       and Path(r["path"]).is_relative_to(Path(s["path"]))), None)
+                retention = project_policy["days"] * 86400 if project_policy else RETENTION.get(r["category"])
+                if retention is None or now - r["created"] < retention:
                     continue
                 obstruction = {"path": r["path"], "reason": "session has a pending tool"}
                 if r["session"] in busy and not include_busy:
@@ -367,6 +569,8 @@ class Store:
                     continue
                 item = {"kind": "tracked", "path": r["path"], "session": r["session"],
                         "fp": json.loads(r["fp"])}
+                if project_policy:
+                    item["project_policy"] = project_policy
                 try:
                     p = self.candidate(Path(r["path"]), self.root_for(item))
                     if fingerprint(p) != item["fp"]:
@@ -443,6 +647,10 @@ class Store:
                                           (item["session"], time.time() - LEASE)).fetchone()
                 if pending:
                     raise Refused("session has a pending tool")
+                policy = item.get("project_policy")
+                retention = policy["days"] * 86400 if policy else RETENTION.get(row["category"])
+                if retention is None or time.time() - row["created"] < retention:
+                    raise Refused("retention has not elapsed")
             if fingerprint(p) != item["fp"]:
                 raise Refused("file changed after preview")
             qdir = root / ".codex-disk-cleanup-quarantine"
@@ -470,6 +678,10 @@ class Store:
         root = Path(row["root"])
         authorized = root.is_relative_to(self.scratch) and root.parent == self.scratch
         authorized = authorized or any(root == Path(r["path"]) for r in self.roots)
+        for spec in self.project_roots:
+            if root == Path(spec["path"]):
+                self.validate_project_root(spec)
+                authorized = True
         if not authorized:
             raise Refused("quarantine root no longer authorized")
         safe_components(root)
@@ -556,7 +768,8 @@ class Store:
         result = {"version": VERSION, "data": str(self.data), "auto": self.config["auto"],
                   "initialized": self.db is not None, "hooks_seen": False,
                   "maintenance": self.roots, "tracked": [], "quarantine": [], "pending": 0,
-                  "pending_sessions": []}
+                  "pending_sessions": [], "project_scratch": self.project_roots,
+                  "project_scratch_errors": self.project_errors}
         if self.db is None:
             result["note"] = "State has not been initialized. Hook trust/dispatch has not been verified."
             return result
@@ -612,6 +825,15 @@ def parser():
     init = subs.add_parser("init", help="Create preview-mode config")
     init.add_argument("--auto", choices=("preview", "quarantine"), default="preview")
     subs.add_parser("status")
+    enroll = subs.add_parser("enroll", help="Enroll a dedicated project scratch directory for one session")
+    enroll.add_argument("--project", type=Path, required=True)
+    enroll.add_argument("--root", type=Path, required=True)
+    enroll.add_argument("--session", required=True)
+    enroll.add_argument("--days", type=int, default=7)
+    enroll.add_argument("--yes", action="store_true")
+    unenroll = subs.add_parser("unenroll", help="Withdraw a project scratch enrollment without moving files")
+    unenroll.add_argument("--root", type=Path, required=True)
+    unenroll.add_argument("--yes", action="store_true")
     subs.add_parser("hook", help="Read one Codex event JSON from stdin")
     ws = subs.add_parser("workspace")
     ws.add_argument("--session", required=True)
@@ -653,8 +875,15 @@ def main(argv=None):
                 context = ("Codex disk cleanup scratch directory: " + str(store.workspace(payload["session_id"]))
                            + ". Plugin state directory (pass as --data): " + str(store.data)
                            + ". Cleanup script: " + str(Path(__file__).resolve())
-                           + ". Put disposable intermediates here. Keep deliverables and regression tests in the project. "
-                           + "Literal paths can be tracked; outputs and arbitrary shell code are not parsed. "
+                           + ". Plan file locations before writing: put disposable scripts, crops, render checks, "
+                           + "contact sheets and staging copies here. Keep final deliverables, reusable assets, "
+                           + "source prompts and audit evidence in the project. "
+                           + "Pre/PostToolUse use bounded directory snapshots to track newly created files here, "
+                           + "including dynamic Python/shell paths. Existing files are not adopted. "
+                           + "Project directories require explicit enroll; never enroll a mixed delivery directory. "
+                           + "Enrolled project scratch for this session: "
+                           + compact([s for s in store.project_roots if s["session"] == payload["session_id"]]) + ". "
+                           + "After success, review tracked candidates; preview does not reclaim disk space. "
                            + "Auto mode: " + store.config["auto"] + ". test_* scratch files may be quarantined at Stop.")
                 result = {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": context}}
             elif event == "Stop":
@@ -665,6 +894,14 @@ def main(argv=None):
             store.config["auto"] = args.auto
             store.save_config()
             result = store.status()
+        elif args.command == "enroll":
+            if not args.yes:
+                raise Refused("enroll requires --yes after reviewing the dedicated directory and retention")
+            result = store.enroll(args.project, args.root, args.session, args.days)
+        elif args.command == "unenroll":
+            if not args.yes:
+                raise Refused("unenroll requires --yes")
+            result = store.unenroll(args.root)
         elif args.command == "workspace":
             result = {"workspace": str(store.workspace(args.session))}
         elif args.command == "status":

@@ -77,6 +77,28 @@ python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" audit
 
 Windows 将上面的 `python3` 换为 `py -3`，并使用 PowerShell 对应的路径变量语法。
 
+## 0.1.4 候选：项目临时目录与动态路径
+
+当前公开发行及本机安装仍为 0.1.3。以下为 0.1.4 源码候选功能，尚未发布或完成新版原生 Hooks 验收。
+
+创建文件前先按用途确定位置：临时脚本、局部裁剪、渲染核对图、参考拼版、暂存副本写入 scratch；正式文件、可复用编辑素材、源提示词与审查证据保留在项目。被替代的尝试若已明确作为审查证据保留，不能仅因文件名是“初稿”就视作一次性文件。
+
+0.1.4 的匹配 PreToolUse/PostToolUse 除字面路径外，还对授权目录作有限的存在性快照，因此 Python 循环、变量拼接路径也可被追踪。不执行或解析任意代码，不从工具输出推定删除权。每个阶段在所有根目录间共用 2000 个目录项预算；超限、访问失败、不同回合重叠或旧格式 pending 存在时，动态覆盖失败关闭，保留字面路径证据，并记录 `coverage-skipped`。
+
+也可明确登记某一会话的专用项目临时子目录。目录必须事先存在，不能是整个项目或混有成品/审查材料的制作目录。示例中的目录与会话 ID 都应替换为实际值：
+
+```sh
+python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" enroll \
+  --project /absolute/project --root /absolute/project/.tmp/session-id \
+  --session ACTUAL_SESSION_ID --days 7 --yes
+python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" unenroll \
+  --root /absolute/project/.tmp/session-id --yes
+```
+
+登记绑定目录设备号/inode及会话，最多 16 个根目录，不允许重叠；不会自动收编已有文件，也不改变 auto 模式。项目临时目录按明确的 `--days` 保留期限处理，覆盖 `test_*` 文件名的零天规则；默认 7 天，明确设置 `--days 0` 才立即满足保留期限。取消登记不移动文件，并使旧计划失去授权。不存在或身份已变化的根目录会在 `status.project_scratch_errors` 中报告，仍可通过 unenroll 取消。
+
+原有 Git 树、数据库、配置、链接/硬链接及成品路径保护继续生效。Git 项目使用插件提供的外部 scratch，不把 Git 树加入清理。隔离、恢复、永久删除的确认与身份检查继续适用；默认仍只预览。宿主生成图片的源缓存不在本功能范围内。历史项目文件只可先制作审查候选清单，不能补造创建记录。
+
 ## 启用自动隔离
 
 默认配置由 `init` 创建；未创建配置时同样按预览模式运行。显式启用：
