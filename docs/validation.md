@@ -10,11 +10,13 @@ Python-loop outputs whose individual paths were not literal tool arguments.
 Candidate 0.1.4 addresses both gaps with clearer location planning, explicit
 project scratch enrollment, and bounded pre/post directory snapshots.
 
-116 local isolated tests pass on macOS / Python 3.11.4, including 34 new cases
+126 local isolated tests pass on macOS / Python 3.11.4, including 44 new cases
 for dynamic paths, actual Python-loop and CLI Hook subprocesses, enrollment and
 withdrawal, existing files, session binding, retention, pending tools, root
 identity, snapshot limits, protected paths, restore/purge and legacy pending
-compatibility. Git trees remain protected. Test cleanup uses temporary fixtures
+compatibility, plus read-only generated-image comparison, scope limits, copy
+evidence, missing sources, no-state CLI behavior and apply rejection. Git trees
+remain protected. Test cleanup uses temporary fixtures
 only; the comic directory was inventoried read-only for human review, not
 enrolled, moved, adopted into tracking or cleaned.
 

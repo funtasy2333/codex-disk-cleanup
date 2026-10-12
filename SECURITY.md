@@ -28,6 +28,12 @@ protect the data directory using OS permissions and do not commit it.
   host timeouts can still block tool dispatch; upgrade after stopping active
   chats and restart instead of editing installed caches or trust records.
 
+generated-preview is a separate read-only exception for one explicitly selected
+CODEX_HOME/generated_images/UUID directory. It compares fingerprints against
+explicit archive directories outside Codex home, creates no state or tracking,
+and offers no executable plan. It does not authorize moving conversation image
+sources merely because identical copies were observed.
+
 ## Threat model and limits
 
 The state directory, configuration and enrolled roots must be controlled by the

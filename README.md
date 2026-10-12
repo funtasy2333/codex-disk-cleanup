@@ -97,7 +97,22 @@ python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" unenroll \
 
 登记绑定目录设备号/inode及会话，最多 16 个根目录，不允许重叠；不会自动收编已有文件，也不改变 auto 模式。项目临时目录按明确的 `--days` 保留期限处理，覆盖 `test_*` 文件名的零天规则；默认 7 天，明确设置 `--days 0` 才立即满足保留期限。取消登记不移动文件，并使旧计划失去授权。不存在或身份已变化的根目录会在 `status.project_scratch_errors` 中报告，仍可通过 unenroll 取消。
 
-原有 Git 树、数据库、配置、链接/硬链接及成品路径保护继续生效。Git 项目使用插件提供的外部 scratch，不把 Git 树加入清理。隔离、恢复、永久删除的确认与身份检查继续适用；默认仍只预览。宿主生成图片的源缓存不在本功能范围内。历史项目文件只可先制作审查候选清单，不能补造创建记录。
+原有 Git 树、数据库、配置、链接/硬链接及成品路径保护继续生效。Git 项目使用插件提供的外部 scratch，不把 Git 树加入清理。隔离、恢复、永久删除的确认与身份检查继续适用；默认仍只预览。宿主生成图片的源缓存不自动登记或清理；使用下述独立只读命令核对。历史项目文件只可先制作审查候选清单，不能补造创建记录。
+
+### 宿主生成图副本核对
+
+图片工具会将原始输出保存在 `CODEX_HOME/generated_images/会话ID/`。项目中另存素材后，这里仍可能保留完全一致的副本。0.1.4 候选提供独立的只读核对命令：
+
+```sh
+python3 "$PLUGIN_DIR/scripts/cleanup.py" generated-preview \
+  --session ACTUAL_SESSION_ID --copy-root /absolute/project/saved-images
+```
+
+`--copy-root` 可重复指定实际归档目录；不提供时只列出该会话源图，不推断已有备份。自定义源位置可指定 `--codex-home ABS_CODEX_HOME`。源范围固定为该 home 的 `generated_images/实际UUID/`，不扫描其他会话或整个 Codex 数据。副本目录必须明确给出，且位于 Codex home 外，也不能包含该 home。
+
+输出每张源图的路径、字节数、指纹和 SHA-256 完全一致的副本路径。相同内容标为 `verified-duplicate-review-required`，没有匹配副本标为 `no-copy-verified`。匹配副本只说明内容已经另存，不说明原路径不再用于会话展示或编辑。
+
+这个命令不创建插件状态或追踪记录、不生成可执行的 `plan_id`、不接受 apply/purge，也不移动或删除文件。它补齐宿主生成图的候选检查通道，保留人工审核；不能把同名文件或一次文件列表当作删除授权。
 
 ## 启用自动隔离
 

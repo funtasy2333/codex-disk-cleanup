@@ -80,6 +80,83 @@ def same_content(a, b):
     return all(a[k] == b[k] for k in ("dev", "ino", "size", "mtime", "sha256"))
 
 
+def generated_preview(session, copy_roots, *, codex_home=None):
+    """Read-only host-image inventory; duplicate evidence is not move authorization."""
+    if not isinstance(session, str) or not re.fullmatch(
+            r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", session):
+        raise Refused("generated image preview requires an actual UUID session id")
+    home = Path(codex_home or os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))).expanduser()
+    if not home.is_absolute():
+        raise Refused("Codex home must be absolute")
+    safe_components(home)
+    home = home.resolve()
+    root = home / "generated_images" / session
+    safe_components(root)
+    result = {"scope": str(root), "session": session, "available": root.is_dir(),
+              "preview_only": True, "items": [], "skipped": [], "bytes": 0, "verified_duplicate_bytes": 0,
+              "note": "No executable plan or tracking is created. Matching copies do not prove "
+                      "the source is unused; moving it may affect conversation images or edits."}
+    if not root.exists():
+        return result
+    if not root.is_dir():
+        raise Refused("generated image session root is not a directory")
+    if len(copy_roots) > 16:
+        raise Refused("at most 16 explicit copy directories are supported")
+    copies, seen, visited = {}, set(), 0
+    extensions = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+
+    def images(directory, recursive):
+        nonlocal visited
+        stack = [directory]
+        while stack:
+            current = stack.pop()
+            safe_components(current)
+            with os.scandir(current) as iterator:
+                for entry in iterator:
+                    visited += 1
+                    if visited > MAX_ITEMS:
+                        raise Refused("generated image preview exceeds 2000 combined entries")
+                    path = Path(entry.path)
+                    if entry.name in PROTECTED or entry.name in SECRETS or entry.name.startswith(".env"):
+                        continue
+                    try:
+                        safe_components(path)
+                        if entry.is_dir(follow_symlinks=False):
+                            if recursive:
+                                stack.append(path)
+                            continue
+                        if path.suffix.lower() not in extensions:
+                            continue
+                        fp = fingerprint(path)
+                        yield path, fp
+                    except (ValueError, OSError) as e:
+                        result["skipped"].append({"path": str(path), "reason": str(e)})
+
+    # Inventory only this exact host session directory, not other Codex data.
+    sources = list(images(root, False))
+    for raw in copy_roots:
+        directory = Path(raw).expanduser()
+        if not directory.is_absolute():
+            raise Refused("copy directories must be absolute")
+        safe_components(directory)
+        directory = directory.resolve(strict=True)
+        if not directory.is_dir() or directory.is_relative_to(home) or home.is_relative_to(directory):
+            raise Refused("copy directories must be outside Codex home and not contain it")
+        for path, fp in images(directory, True):
+            if str(path) not in seen:
+                copies.setdefault(fp["sha256"], []).append({"path": str(path), "fp": fp})
+                seen.add(str(path))
+    for path, fp in sorted(sources, key=lambda pair: str(pair[0])):
+        matches = copies.get(fp["sha256"], [])
+        result["items"].append({"kind": "generated-image-preview", "path": str(path), "fp": fp,
+                                "matching_copies": matches,
+                                "classification": "verified-duplicate-review-required" if matches
+                                                  else "no-copy-verified"})
+        result["bytes"] += fp["size"]
+    result["verified_duplicate_bytes"] = sum(i["fp"]["size"] for i in result["items"] if i["matching_copies"])
+    return result
+
+
 class Store:
     def __init__(self, data: Path, *, read_only=False):
         # Resolve OS aliases (e.g. /tmp on macOS) once; descendants stay lexical.
@@ -825,6 +902,10 @@ def parser():
     init = subs.add_parser("init", help="Create preview-mode config")
     init.add_argument("--auto", choices=("preview", "quarantine"), default="preview")
     subs.add_parser("status")
+    generated = subs.add_parser("generated-preview", help="Read-only generated-image copy comparison; never applies")
+    generated.add_argument("--session", required=True)
+    generated.add_argument("--copy-root", type=Path, action="append", default=[])
+    generated.add_argument("--codex-home", type=Path)
     enroll = subs.add_parser("enroll", help="Enroll a dedicated project scratch directory for one session")
     enroll.add_argument("--project", type=Path, required=True)
     enroll.add_argument("--root", type=Path, required=True)
@@ -860,6 +941,10 @@ def main(argv=None):
     is_hook = args.command == "hook"
     store = None
     try:
+        if args.command == "generated-preview":
+            result = generated_preview(args.session, args.copy_root, codex_home=args.codex_home)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
         data, data_source = resolve_data(args.data)
         store = Store(data, read_only=args.command == "status")
         if is_hook:

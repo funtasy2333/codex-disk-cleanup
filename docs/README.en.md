@@ -105,7 +105,8 @@ roots, capturing variable Python/shell paths without evaluating code or output.
 All roots share a 2000-entry budget per phase. Overflow, access failures,
 overlapping turns and legacy pending calls disable dynamic snapshots, retain
 literal evidence and record coverage-skipped. No post without a matching pre
-can adopt files. Host generated-image source caches stay outside this scope.
+can adopt files. Host generated-image source caches are not automatically enrolled or cleaned;
+use the separate read-only comparison below.
 
 Explicitly enroll an existing dedicated subdirectory for one actual session:
 
@@ -128,6 +129,26 @@ links and hardlinks stay protected; Git projects use external plugin scratch.
 Quarantine, restore and explicit purge keep their confirmation/identity checks.
 Historical files may be listed for review but never receive fabricated tracking
 records. Default remains preview.
+
+### Read-only host generated-image comparison
+
+```sh
+python3 "$PLUGIN_DIR/scripts/cleanup.py" generated-preview \
+  --session ACTUAL_SESSION_ID --copy-root /absolute/project/saved-images
+```
+
+The source scope is exactly CODEX_HOME/generated_images/UUID, not other sessions
+or all Codex data. Repeat --copy-root for explicit archive directories outside
+Codex home; without copies, no backup is inferred. Optional --codex-home selects
+the source home for this command only. A shared 2000-entry budget bounds source
+and copy traversal. Symlinks, hardlinks, protected paths and oversized files are
+not candidate evidence.
+
+Every source reports its fingerprint, bytes and exact SHA-256 matching copies.
+verified-duplicate-review-required means a copy was observed, not that the source
+is unused; moving originals may affect conversation images or later edits.
+no-copy-verified preserves uncertainty. The command creates no plugin state,
+tracking or executable plan, accepts no apply/purge and never moves files.
 
 ## Maintenance
 

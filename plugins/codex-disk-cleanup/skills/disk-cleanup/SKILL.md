@@ -81,3 +81,15 @@ calls disable dynamic coverage and record coverage-skipped; literal creation
 evidence remains usable. Do not describe all creations as tracked without
 checking status. Existing project files can be listed as review candidates, but
 never retroactively manufacture Hook tracking records for them.
+
+
+When the task used host image generation, review the other output location too:
+run generated-preview --session ACTUAL_UUID --copy-root ABS_ARCHIVE to compare
+CODEX_HOME/generated_images/that-session against explicitly saved project images.
+Repeat copy-root when necessary; never scan all generated_images sessions or
+all Codex data. The command is read-only and creates no state, tracking or
+executable plan. A verified duplicate is a review candidate, not disposal
+authorization: its original path may still be used by the conversation or image
+edits. No match means no backup verified. Keep source copies outside Codex home.
+Do not enroll generated_images as project scratch or fabricate creation evidence
+for existing host images.

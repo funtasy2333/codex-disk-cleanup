@@ -10,7 +10,11 @@
 - Keep schema 1 and read legacy pending lists. Preview, pending guards, path and
   fingerprint checks, quarantine/restore and explicit purge remain in force.
 - Improve SessionStart file-location guidance and root/status diagnostics.
-- Add 34 isolated project-root, dynamic subprocess and safety regressions. Native
+- Add a separate read-only generated-preview command for exact per-session host
+  image directories and SHA-256 matching archive copies. It creates no state,
+  tracking or executable plans and never cleans conversation image sources.
+- Add 44 isolated project-root, dynamic subprocess, generated-image preview and
+  safety regressions. Native
   acceptance and cross-platform CI of 0.1.4 remain outstanding.
 
 ## 0.1.3 — 2026-10-12

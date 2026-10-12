@@ -80,5 +80,8 @@ Quarantine/restore/purge retain their existing confirmation and identity rules.
 
 Plan file locations before writing: crops, render checks, reference contact
 sheets, temporary scripts and staging copies belong in scratch; final files,
-reusable assets, source prompts and audit evidence belong in the project. Host
-generated-image source caches remain outside this plugin's scope.
+reusable assets, source prompts and audit evidence belong in the project. Host generated-image source caches are not automatically cleaned. Use
+generated-preview --session ACTUAL_UUID --copy-root ABS_ARCHIVE to inspect
+this exact session source directory and SHA-256 matching project copies. This
+read-only command creates no state, tracking or executable plan; copies do not
+prove originals are unused by conversation viewing or editing.

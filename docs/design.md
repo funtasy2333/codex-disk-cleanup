@@ -39,6 +39,13 @@ Project policy is included in plans and revalidated for moves; root identity is
 also checked for restore/purge. Withdrawal keeps files and tracking records while
 revoking plan authorization. Default preview and all existing protections remain.
 
+Host generated images have a separate read-only adapter. `generated-preview`
+inventories only the specified UUID directory under Codex home and compares
+SHA-256 against explicitly supplied copy directories outside that home. Source
+and copy scans share a 2000-entry budget. It creates no state, tracking records
+or executable plan: a verified duplicate can still be referenced by conversation
+display or later edits. Host source images are never enrolled automatically.
+
 SQLite uses WAL, FULL synchronous writes and `BEGIN IMMEDIATE` for state changes.
 Pending records key on `(session_id, tool_use_id)`. The database records schema
 version 1 and refuses unknown schema versions. Plans live in state, not editable
