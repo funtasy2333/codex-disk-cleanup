@@ -27,11 +27,13 @@ quoted literal paths, and `apply_patch` Add/Update headers. It ignores output an
 does not evaluate source code, variables or command substitution. In 0.1.4,
 matching tool calls also compare bounded existence snapshots inside managed
 roots. Only paths absent before and present after enter fingerprint validation.
-Existing device/inode identities prevent renamed or relocated old files from
-being adopted. An explicit project enrollment binds a dedicated descendant directory to one
+Existing device/inode identities, including protected-file and subtree metadata
+without reading protected contents, prevent renamed or relocated old files from
+being adopted. An incomplete or ambiguous Pre phase suspends all new-file adoption because
+an unobserved source could move across roots. An explicit project enrollment binds a dedicated descendant directory to one
 session, device/inode and retention policy; existing files are never adopted.
 All snapshots share a 2000-entry per-phase budget. Errors and cross-turn/legacy
-pending ambiguity disable dynamic coverage instead of broadening it.
+pending ambiguity disable new adoption, including literal destinations, instead of broadening it.
 
 Project enrollments are optional schema-1 configuration. Pending JSON supports
 both old literal lists and new snapshot evidence, so no SQL migration is needed.

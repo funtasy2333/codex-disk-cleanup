@@ -13,7 +13,7 @@ session after upgrading and restarting; see the validation record.
 ## Install
 
 ```sh
-codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.3
+codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.4
 codex plugin add codex-disk-cleanup@codex-disk-cleanup-marketplace
 ```
 
@@ -81,8 +81,8 @@ cleanup run `init --auto quarantine`; `init --auto preview` disables it again.
 Quarantine does not reclaim disk space. Only an explicit per-item `purge ID --yes`
 permanently removes a quarantined file. `restore` never overwrites another file.
 
-SessionStart provides an isolated session scratch directory. Only literal paths
-proven absent before and present after the same tool call are tracked.
+SessionStart provides an isolated session scratch directory. Literal paths and
+bounded snapshots establish absence/identity evidence across the same tool call.
 `test_*` / `tmp_test_*` files can be quarantined at the current turn's Stop or
 SessionEnd; other scratch files retain seven days, and `cron-output/` files
 retain fourteen days. Modified files are skipped. Pending tool records and
@@ -91,10 +91,10 @@ sessions. For unusually long-running jobs, keep preview mode enabled.
 Dynamic shell/code paths and outputs are not evaluated. Deliverables and
 permanent tests belong in the project, not scratch.
 
-## 0.1.4 source candidate: project scratch and dynamic paths
+## 0.1.4: project scratch and dynamic paths
 
-Published/installed 0.1.3 remains unchanged. Candidate 0.1.4 is not yet released
-or accepted for native dispatch. Plan locations before writing: disposable
+Version 0.1.4 adds coverage for project scratch and dynamic paths. Full native
+lifecycle acceptance remains pending upgrade and restart. Plan locations before writing: disposable
 scripts, crops, render checks, reference contact sheets and staging copies go
 to scratch; final files, reusable source assets, source prompts and audit
 evidence stay in the project. Superseded attempts retained as audit evidence
@@ -103,8 +103,8 @@ are not disposable solely because their names say draft.
 Matching pre/post calls compare bounded existence snapshots inside authorized
 roots, capturing variable Python/shell paths without evaluating code or output.
 All roots share a 2000-entry budget per phase. Overflow, access failures,
-overlapping turns and legacy pending calls disable dynamic snapshots, retain
-literal evidence and record coverage-skipped. No post without a matching pre
+overlapping turns and legacy pending calls suspend new adoption, including
+literal destinations, and record coverage-skipped. No post without a matching pre
 can adopt files. Host generated-image source caches are not automatically enrolled or cleaned;
 use the separate read-only comparison below.
 

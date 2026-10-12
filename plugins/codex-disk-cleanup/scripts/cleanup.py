@@ -372,24 +372,28 @@ class Store:
         limit = MAX_ITEMS if budget is None else budget
         while stack:
             base = stack.pop()
-            if base != root:
-                self.candidate(base, root)
+            safe_components(base)
             with os.scandir(base) as iterator:
                 for entry in iterator:
                     visited += 1
                     if visited > limit:
                         raise Refused("scratch snapshot exceeds 2000 entries; use a smaller dedicated directory")
                     p = Path(entry.path)
+                    existing = entry.stat(follow_symlinks=False)
+                    if stat.S_ISLNK(existing.st_mode) or getattr(existing, "st_file_attributes", 0) & 0x400:
+                        continue
+                    safe_components(p)
+                    # Identity evidence includes protected files/subtrees, but
+                    # eligibility remains separate. Never hash their contents.
+                    if stat.S_ISDIR(existing.st_mode):
+                        stack.append(p)
+                        continue
+                    identities[str(p)] = [existing.st_dev, existing.st_ino]
                     try:
                         self.candidate(p, root)
                     except (ValueError, OSError):
                         continue
-                    if entry.is_dir(follow_symlinks=False):
-                        stack.append(p)
-                    else:
-                        entries.append(str(p))
-                        existing = entry.stat(follow_symlinks=False)
-                        identities[str(p)] = [existing.st_dev, existing.st_ino]
+                    entries.append(str(p))
         return {"root": str(root), "dev": identity.st_dev, "ino": identity.st_ino,
                 "entries": sorted(entries), "identities": identities, "visited": visited}
 
@@ -512,11 +516,12 @@ class Store:
                             ambiguous = True
                             if isinstance(prior, dict):
                                 prior["snapshots"] = []
+                                prior["absent"] = []
                                 self.db.execute("UPDATE pending SET paths=? WHERE session=? AND call=?",
                                                 (compact(prior), session, pending["call"]))
                     if ambiguous:
                         self.audit("coverage-skipped", {"session": session,
-                            "reason": "overlapping turn or legacy pending tool; literal tracking only"})
+                            "reason": "overlapping turn or legacy pending tool; new-file tracking suspended"})
                     budget = MAX_ITEMS
                     for managed, policy in ([] if ambiguous else roots):
                         if budget <= 0:
@@ -532,6 +537,16 @@ class Store:
                             budget = 0
                             self.audit("coverage-skipped", {"session": session, "root": str(managed),
                                                             "reason": str(e)})
+                    if len(snapshots) != len(roots):
+                        # An incomplete root can contain the source of a move
+                        # into any other root. Partial snapshots cannot prove
+                        # dynamic creation anywhere in this phase.
+                        literal_identities.extend(identity for snap in snapshots
+                                                  for identity in snap["identities"].values())
+                        snapshots = []
+                        absent = []
+                        self.audit("coverage-skipped", {"session": session,
+                            "reason": "incomplete identity coverage; new-file tracking suspended"})
                     # Even a call with no new paths may read/write tracked files.
                     # Keep a lease for every observed call, not just file creation.
                     self.db.execute("INSERT OR REPLACE INTO pending VALUES (?,?,?,?)",

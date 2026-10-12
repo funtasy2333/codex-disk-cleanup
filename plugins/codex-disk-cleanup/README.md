@@ -51,7 +51,7 @@ for inspection. See the repository SECURITY.md before enrollment.
 
 ## Project scratch and dynamic file creation (0.1.4)
 
-This source candidate adds bounded Pre/PostToolUse directory snapshots, so Python
+Version 0.1.4 adds bounded Pre/PostToolUse directory snapshots, so Python
 loops and variable paths can be observed inside managed roots. A matching pre
 call is required; preexisting files are never adopted. Directory snapshots do
 not evaluate shell code or tool output. The combined budget is 2000 entries per

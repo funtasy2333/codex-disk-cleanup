@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.4 — Unreleased (2026-10-12)
+## 0.1.4 — 2026-10-12
 
 - Add explicit per-session enrollment of dedicated project scratch directories,
   with root identity, retention and overlap checks; withdrawal invalidates plans.
@@ -13,9 +13,9 @@
 - Add a separate read-only generated-preview command for exact per-session host
   image directories and SHA-256 matching archive copies. It creates no state,
   tracking or executable plans and never cleans conversation image sources.
-- Add 44 isolated project-root, dynamic subprocess, generated-image preview and
-  safety regressions. Native
-  acceptance and cross-platform CI of 0.1.4 remain outstanding.
+- Add 50 isolated project-root, dynamic subprocess, generated-image preview and
+  safety regressions, including protected-source rename and cross-root overflow
+  ownership checks. Full native lifecycle acceptance remains outstanding.
 
 ## 0.1.3 — 2026-10-12
 

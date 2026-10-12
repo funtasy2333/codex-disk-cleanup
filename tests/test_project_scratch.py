@@ -154,6 +154,90 @@ class ProjectScratchTests(unittest.TestCase):
         self.assertEqual(self.store.status()['tracked'], [])
         self.assertEqual(renamed.read_bytes(), b'original')
 
+    def test_protected_existing_database_renamed_dynamically_is_not_adopted(self):
+        self.enroll()
+        old = self.root / 'important.sqlite3'
+        old.write_bytes(b'original database')
+        self.store.hook(self.payload('PreToolUse'))
+        new = self.root / 'test_new.txt'
+        old.rename(new)
+        self.store.hook(self.payload('PostToolUse'))
+        self.assertEqual(self.store.status()['tracked'], [])
+        self.assertEqual(self.plan()['items'], [])
+        self.assertEqual(new.read_bytes(), b'original database')
+
+    def test_protected_subtree_existing_file_moved_out_is_not_adopted(self):
+        self.enroll()
+        protected = self.root / 'outputs'
+        protected.mkdir()
+        old = protected / 'retained.txt'
+        old.write_bytes(b'original evidence')
+        self.store.hook(self.payload('PreToolUse'))
+        new = self.root / 'test_new.txt'
+        old.rename(new)
+        self.store.hook(self.payload('PostToolUse'))
+        self.assertEqual(self.store.status()['tracked'], [])
+        self.assertEqual(new.read_bytes(), b'original evidence')
+
+    def test_overflowing_root_existing_file_moved_to_other_root_is_not_adopted(self):
+        self.enroll()
+        for name in ['old.txt', 'two', 'three']:
+            (self.root / name).write_text('original')
+        with patch.object(c, 'MAX_ITEMS', 2):
+            self.store.hook(self.payload('PreToolUse'))
+            new = self.builtin / 'test_new.txt'
+            (self.root / 'old.txt').rename(new)
+            self.store.hook(self.payload('PostToolUse'))
+        self.assertEqual(self.store.status()['tracked'], [])
+        self.assertEqual(self.plan()['items'], [])
+        self.assertEqual(new.read_text(), 'original')
+
+    def test_overflow_protected_source_literal_rename_is_not_adopted(self):
+        self.enroll()
+        old = self.root / 'important.sqlite3'
+        old.write_bytes(b'original database')
+        for name in ['two', 'three']:
+            (self.root / name).write_text('old')
+        new = self.root / 'test_new.txt'
+        payload = self.payload('PreToolUse', cmd=f'mv {old} {new}')
+        with patch.object(c, 'MAX_ITEMS', 2):
+            self.store.hook(payload)
+            old.rename(new)
+            payload['hook_event_name'] = 'PostToolUse'
+            self.store.hook(payload)
+        self.assertEqual(self.store.status()['tracked'], [])
+        self.assertEqual(new.read_bytes(), b'original database')
+
+    def test_overflow_literal_destination_alone_cannot_prove_creation(self):
+        self.enroll()
+        old = self.root / 'old.txt'
+        old.write_bytes(b'original')
+        for name in ['two', 'three']:
+            (self.root / name).write_text('old')
+        new = self.builtin / 'test_new.txt'
+        payload = self.payload('PreToolUse', cmd=f'python helper.py --destination {new}')
+        with patch.object(c, 'MAX_ITEMS', 2):
+            self.store.hook(payload)
+            old.rename(new)
+            payload['hook_event_name'] = 'PostToolUse'
+            self.store.hook(payload)
+        self.assertEqual(self.store.status()['tracked'], [])
+        self.assertEqual(new.read_bytes(), b'original')
+
+    def test_cross_turn_invalidation_cannot_restore_unsafe_literal_adoption(self):
+        self.enroll()
+        old = self.root / 'important.sqlite3'
+        old.write_bytes(b'original database')
+        new = self.root / 'test_new.txt'
+        first = self.payload('PreToolUse', call='first', cmd=f'mv {old} {new}')
+        self.store.hook(first)
+        self.store.hook(self.payload('PreToolUse', call='second', turn='t2'))
+        old.rename(new)
+        first['hook_event_name'] = 'PostToolUse'
+        self.store.hook(first)
+        self.assertEqual(self.store.status()['tracked'], [])
+        self.assertEqual(new.read_bytes(), b'original database')
+
     def test_existing_file_moved_between_managed_roots_is_not_adopted(self):
         self.enroll()
         old = self.builtin / 'existing.png'
