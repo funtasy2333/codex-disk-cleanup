@@ -1,6 +1,6 @@
 {
   "name": "codex-disk-cleanup",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Evidence-based temporary file cleanup for local Codex.",
   "author": {
     "name": "funtasy2333"

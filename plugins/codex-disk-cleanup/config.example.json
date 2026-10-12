@@ -2,5 +2,6 @@
   "schema": 1,
   "auto": "preview",
   "maintenance": [],
-  "project_scratch": []
+  "project_scratch": [],
+  "discover_temp": true
 }
