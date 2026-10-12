@@ -1,4 +1,4 @@
-# Codex Disk Cleanup 0.1.2
+# Codex Disk Cleanup 0.1.3
 
 Local Codex scratch-file lifecycle plugin. Python 3.10+, standard library only.
 Initial testable release; default behavior is preview, not automatic deletion.
@@ -24,6 +24,15 @@ python3 scripts/cleanup.py --data /absolute/plugin-data purge QUARANTINE_ID --ye
 Run from this directory or use the absolute script path. Windows: use `py -3`.
 Plain `quick` and `deep` only preview. Plans expire after 15 minutes. Quarantine
 does not reclaim disk space; purge permanently deletes one selected item.
+
+Select the current session with `--session ACTUAL_SESSION_ID`; otherwise manual
+previews omit active sessions. Pending candidates remain visible in previews,
+with exact paths, bytes and plan IDs. `blocked` lists pending execution guards;
+byte totals include blocked candidates. Apply still refuses live pending tools,
+including its own native tool lease. Wait for tools to finish and use the normal
+lifecycle flow or a separate terminal for authorized execution. Never delete
+pending records to bypass this guard. `status` includes `pending_sessions` for
+live tool counts and oldest timestamps.
 
 Explicitly enable automatic quarantine with `init --auto quarantine`; return to
 preview with `init --auto preview`. Auto mode only handles newly proven scratch

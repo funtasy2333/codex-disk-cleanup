@@ -287,6 +287,143 @@ class CleanupTests(unittest.TestCase):
         self.assertEqual(self.plan()['items'], [])
         self.assertTrue(path.exists())
 
+    def test_cli_preview_pending_hook_fixture_lists_exact_file(self):
+        path = self.create()
+        before = path.read_bytes()
+        for args in [('dry-run', '--scope', 'quick'), ('quick',), ('deep',)]:
+            with self.subTest(args=args):
+                command = [sys.executable, str(SCRIPT), '--data', str(self.store.data),
+                           *args, '--session', 's1']
+                payload = self.payload('PreToolUse', call='preview', tool_name='Bash',
+                                       tool_input={'command': ' '.join(command)})
+                self.store.hook(payload)
+                try:
+                    proc = subprocess.run(command, capture_output=True, text=True)
+                    self.assertEqual(proc.returncode, 0, proc.stderr)
+                    plan = json.loads(proc.stdout)
+                    self.assertEqual([i['path'] for i in plan['items']], [str(path)])
+                    self.assertEqual(plan['items'][0]['fp']['size'], len(before))
+                    self.assertEqual(plan['bytes'], len(before))
+                    self.assertTrue(plan['plan_id'])
+                    self.assertEqual(plan['blocked'], [
+                        {'path': str(path), 'reason': 'session has a pending tool'}])
+                    self.assertEqual(path.read_bytes(), before)
+                    self.assertEqual(self.store.status()['pending'], 1)
+                    self.assertEqual(self.store.status()['quarantine'], [])
+                finally:
+                    payload['hook_event_name'] = 'PostToolUse'
+                    self.store.hook(payload)
+
+    def test_busy_preview_plan_still_refuses_apply(self):
+        path = self.create()
+        self.store.hook(self.payload('PreToolUse', path, call='editing'))
+        plan = self.store.plan(session='s1', include_busy=True)
+        self.assertEqual(len(plan['items']), 1)
+        result = self.store.apply(plan['plan_id'])
+        self.assertEqual(result['quarantined'], [])
+        self.assertEqual(result['skipped'], [
+            {'path': str(path), 'reason': 'session has a pending tool'}])
+        self.assertTrue(path.exists())
+
+    def test_busy_preview_still_checks_fingerprint(self):
+        path = self.create()
+        self.store.hook(self.payload('PreToolUse', path, call='editing'))
+        path.write_text('important revision')
+        plan = self.store.plan(session='s1', include_busy=True)
+        self.assertEqual(plan['items'], [])
+        self.assertEqual(plan['blocked'], [])
+        self.assertEqual(plan['skipped'], [
+            {'path': str(path), 'reason': 'modified since tracking'}])
+        self.assertTrue(path.exists())
+
+    def test_busy_preview_apply_after_matching_post_completes(self):
+        path = self.create()
+        payload = self.payload('PreToolUse', call='preview', tool_input={})
+        self.store.hook(payload)
+        plan = self.store.plan(session='s1', include_busy=True)
+        self.assertEqual(len(plan['blocked']), 1)
+        payload['hook_event_name'] = 'PostToolUse'
+        self.store.hook(payload)
+        result = self.store.apply(plan['plan_id'])
+        self.assertEqual(len(result['quarantined']), 1)
+        self.assertEqual(result['skipped'], [])
+        self.assertFalse(path.exists())
+
+    def test_expired_pending_does_not_block_preview(self):
+        path = self.create()
+        self.store.hook(self.payload('PreToolUse', call='expired', tool_input={}))
+        self.store.db.execute('UPDATE pending SET created=0')
+        plan = self.store.plan(session='s1', include_busy=True)
+        self.assertEqual([i['path'] for i in plan['items']], [str(path)])
+        self.assertEqual(plan['blocked'], [])
+        self.assertEqual(self.store.status()['pending_sessions'], [])
+
+    def test_busy_preview_preserves_session_selection(self):
+        ours = self.create()
+        other = self.create(session='other')
+        self.store.hook(self.payload('PreToolUse', call='preview', tool_input={}))
+        self.assertEqual(self.store.plan(include_busy=True)['items'], [])
+        plan = self.store.plan(session='s1', include_busy=True)
+        self.assertEqual([i['path'] for i in plan['items']], [str(ours)])
+        self.assertTrue(other.exists())
+
+    def test_busy_preview_preserves_retention(self):
+        path = self.create('scratch.txt')
+        self.store.hook(self.payload('PreToolUse', call='preview', tool_input={}))
+        plan = self.store.plan(session='s1', include_busy=True)
+        self.assertEqual(plan['items'], [])
+        self.assertEqual(plan['blocked'], [])
+        self.assertTrue(path.exists())
+
+    def test_preview_lifecycle_shows_pending_candidates_without_moving(self):
+        path = self.create()
+        self.store.hook(self.payload('PreToolUse', call='running', tool_input={}))
+        for event in ['Stop', 'SessionEnd']:
+            with self.subTest(event=event):
+                plan = self.store.hook(self.payload(event))['preview']
+                self.assertEqual([i['path'] for i in plan['items']], [str(path)])
+                self.assertEqual(plan['blocked'], [
+                    {'path': str(path), 'reason': 'session has a pending tool'}])
+                self.assertTrue(path.exists())
+                self.assertEqual(self.store.status()['pending'], 1)
+                self.assertEqual(self.store.status()['quarantine'], [])
+
+    def test_auto_lifecycle_pending_skip_has_reason(self):
+        path = self.create()
+        self.store.config['auto'] = 'quarantine'
+        self.store.hook(self.payload('PreToolUse', call='running', tool_input={}))
+        for event in ['Stop', 'SessionEnd']:
+            with self.subTest(event=event):
+                plan = self.store.hook(self.payload(event))['preview']
+                self.assertEqual(plan['items'], [])
+                self.assertEqual(plan['skipped'], [
+                    {'path': str(path), 'reason': 'session has a pending tool'}])
+                self.assertTrue(path.exists())
+
+    def test_preview_lifecycle_keeps_turn_filter_with_pending(self):
+        old = self.create(call='old', turn='old')
+        new = self.create('test_new.py', call='new')
+        self.store.hook(self.payload('PreToolUse', call='running', tool_input={}))
+        plan = self.store.hook(self.payload('Stop'))['preview']
+        self.assertEqual([i['path'] for i in plan['items']], [str(new)])
+        plan = self.store.hook(self.payload('SessionEnd'))['preview']
+        self.assertEqual({i['path'] for i in plan['items']}, {str(old), str(new)})
+        self.assertTrue(old.exists())
+        self.assertTrue(new.exists())
+
+    def test_status_groups_live_pending_sessions_without_mutation(self):
+        self.store.hook(self.payload('PreToolUse', call='first', tool_input={}))
+        self.store.hook(self.payload('PreToolUse', call='second', tool_input={}))
+        self.store.hook(self.payload('PreToolUse', session='other', call='third', tool_input={}))
+        self.store.db.execute("UPDATE pending SET created=0 WHERE session='other'")
+        status = self.store.status()
+        self.assertEqual(status['pending'], 3)
+        self.assertEqual(status['pending_sessions'][0]['session'], 's1')
+        self.assertEqual(status['pending_sessions'][0]['tools'], 2)
+        self.assertGreater(status['pending_sessions'][0]['oldest_created'], 0)
+        self.assertEqual(len(status['pending_sessions']), 1)
+        self.assertEqual(self.store.db.execute('SELECT count(*) FROM pending').fetchone()[0], 3)
+
     def test_stop_only_current_turn(self):
         old = self.create(call='old', turn='old')
         new = self.create('test_new.py', call='new')

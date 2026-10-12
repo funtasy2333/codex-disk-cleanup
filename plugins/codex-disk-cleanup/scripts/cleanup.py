@@ -16,7 +16,7 @@ import sys
 import time
 import uuid
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 RETENTION = {"test": 0, "temp": 7 * 86400, "cron-output": 14 * 86400}
 PROTECTED = {".git", ".codex", ".agents", "sessions", "archived_sessions", "memories",
              "skills", "plugins", "outputs", "deliverables", "node_modules", ".ssh",
@@ -328,7 +328,8 @@ class Store:
                 return {"ignored": "Stop missing turn_id"}
             plan = self.plan("quick", session=session,
                              turn=payload.get("turn_id") if event == "Stop" else None,
-                             stale_only=event == "SessionStart")
+                             stale_only=event == "SessionStart",
+                             include_busy=self.config["auto"] == "preview")
             if self.config["auto"] == "quarantine" and plan["items"]:
                 result = self.apply(plan["plan_id"])
             else:
@@ -338,17 +339,18 @@ class Store:
             return result
         return {"ignored": event}
 
-    def plan(self, scope="quick", session=None, turn=None, stale_only=False):
+    def plan(self, scope="quick", session=None, turn=None, stale_only=False,
+             include_busy=False):
+        # A preview may inspect busy files without authorizing a move. Automatic
+        # quarantine keeps the pending guard here; move() always rechecks it.
         now = time.time()
-        items, skipped = [], []
+        items, skipped, blocked = [], [], []
         with self.transaction():
             active = {r["id"] for r in self.db.execute("SELECT * FROM sessions WHERE ended=0 AND seen>?",
                                                       (now - LEASE,))}
             busy = {r["session"] for r in self.db.execute("SELECT session FROM pending WHERE created>?",
                                                         (now - LEASE,))}
             for r in self.db.execute("SELECT * FROM tracked ORDER BY created LIMIT ?", (MAX_ITEMS,)):
-                if r["session"] in busy:
-                    continue
                 if stale_only and r["session"] in active:
                     continue
                 if session and not stale_only and r["session"] != session:
@@ -359,6 +361,10 @@ class Store:
                     continue
                 if r["category"] not in RETENTION or now - r["created"] < RETENTION[r["category"]]:
                     continue
+                obstruction = {"path": r["path"], "reason": "session has a pending tool"}
+                if r["session"] in busy and not include_busy:
+                    skipped.append(obstruction)
+                    continue
                 item = {"kind": "tracked", "path": r["path"], "session": r["session"],
                         "fp": json.loads(r["fp"])}
                 try:
@@ -366,6 +372,8 @@ class Store:
                     if fingerprint(p) != item["fp"]:
                         raise Refused("modified since tracking")
                     items.append(item)
+                    if r["session"] in busy:
+                        blocked.append(obstruction)
                 except (OSError, ValueError) as e:
                     skipped.append({"path": r["path"], "reason": str(e)})
             if scope == "deep":
@@ -373,9 +381,13 @@ class Store:
             pid = uuid.uuid4().hex
             self.db.execute("DELETE FROM plans WHERE created < ?", (now - PLAN_TTL,))
             self.db.execute("INSERT INTO plans VALUES (?,?,?,0)", (pid, now, compact(items)))
-            self.audit("plan", {"id": pid, "scope": scope, "count": len(items)})
+            self.audit("plan", {"id": pid, "scope": scope, "count": len(items),
+                                "blocked": len(blocked), "skipped": len(skipped)})
         return {"plan_id": pid, "expires_in_seconds": PLAN_TTL, "scope": scope,
-                "items": items, "skipped": skipped, "bytes": sum(i["fp"]["size"] for i in items)}
+                "items": items, "skipped": skipped, "blocked": blocked,
+                "bytes": sum(i["fp"]["size"] for i in items),
+                "note": "Preview only. Apply rechecks pending tools and file identity; "
+                        "blocked candidates are included in the byte total."}
 
     def scan_maintenance(self, items, skipped):
         visited = 0
@@ -543,7 +555,8 @@ class Store:
     def status(self):
         result = {"version": VERSION, "data": str(self.data), "auto": self.config["auto"],
                   "initialized": self.db is not None, "hooks_seen": False,
-                  "maintenance": self.roots, "tracked": [], "quarantine": [], "pending": 0}
+                  "maintenance": self.roots, "tracked": [], "quarantine": [], "pending": 0,
+                  "pending_sessions": []}
         if self.db is None:
             result["note"] = "State has not been initialized. Hook trust/dispatch has not been verified."
             return result
@@ -552,7 +565,10 @@ class Store:
                 "tracked": [dict(r) for r in self.db.execute("SELECT path,session,category,created FROM tracked")],
                 "quarantine": [dict(r) for r in self.db.execute("SELECT id,source,state,created FROM moves "
                                                                 "WHERE state NOT IN ('purged','restored','cancelled')")],
-                "pending": self.db.execute("SELECT count(*) FROM pending").fetchone()[0]})
+                "pending": self.db.execute("SELECT count(*) FROM pending").fetchone()[0],
+                "pending_sessions": [dict(r) for r in self.db.execute(
+                    "SELECT session,count(*) AS tools,min(created) AS oldest_created FROM pending "
+                    "WHERE created>? GROUP BY session ORDER BY session", (time.time() - LEASE,))]})
         return result
 
 
@@ -661,7 +677,7 @@ def main(argv=None):
                 result = store.apply(args.apply)
             else:
                 scope = args.scope if args.command == "dry-run" else args.command
-                result = store.plan(scope, session=args.session)
+                result = store.plan(scope, session=args.session, include_busy=True)
         elif args.command == "restore":
             result = store.restore(args.id)
         elif args.command == "purge":

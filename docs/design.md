@@ -9,11 +9,11 @@ flowchart LR
   B --> C[PostToolUse: same session and call]
   C --> D[Regular file + protected-path check + fingerprint]
   D --> E[Tracked file]
-  E --> F[Quick preview: retention + active lease + pending guard]
+  E --> F[Quick preview: retention + session/turn + fingerprint]
   G[Explicit cache/log roots] --> H[Manual deep preview]
   H --> I[Single-use 15 minute plan]
   F --> I
-  I --> J[Current policy + SHA-256 revalidation]
+  I --> J[Pending guard + current policy + SHA-256 revalidation]
   J --> K[Durable move intent]
   K --> L[Same-root quarantine]
   L --> M[Restore without overwrite]
@@ -31,6 +31,19 @@ Pending records key on `(session_id, tool_use_id)`. The database records schema
 version 1 and refuses unknown schema versions. Plans live in state, not editable
 external plan files. Each candidate includes its current authorization policy,
 device, inode, size, mode, mtime, ctime and SHA-256.
+
+Manual previews include busy candidates so the preview command's own native
+PreToolUse lease cannot hide a selected session. `blocked` names the candidates
+currently guarded by a pending tool; `bytes` includes those candidates. This is
+a snapshot, not an execution exemption: move() always checks live pending tools
+again. Automatic quarantine plans exclude busy candidates and report a skipped
+reason. Preview-mode lifecycle plans may display them. All session, turn,
+retention, protected-path and fingerprint filters still apply. Without an
+explicit session, manual previews continue to omit active sessions.
+
+Status exposes `pending_sessions` with live tool counts and oldest timestamps;
+the existing `pending` count includes all rows, including expired leases awaiting
+normal Hook housekeeping. Status never edits those rows. Schema 1 is unchanged.
 
 A move intent is committed before rename. Final state is committed after identity
 verification. Recovery inspects source and destination instead of assuming the

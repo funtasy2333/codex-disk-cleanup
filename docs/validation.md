@@ -2,6 +2,37 @@
 
 Version: 0.1.2. Research/development dates: 2026-10-10–11.
 
+## v0.1.3 candidate — 2026-10-12
+
+Native v0.1.2 acceptance in session
+`01a12dcb-b27c-73e1-af03-877c2866a8a0` proved actual creation tracking via the
+normal editor and PreToolUse/PostToolUse. The 38-byte `test_preview_native.py`
+remained tracked and present, but the session-scoped quick dry-run returned
+empty items and zero bytes. Its tool call held a live pending lease, which
+caused plan() to skip the whole session. No apply, purge or policy change was
+performed during that acceptance.
+
+Candidate 0.1.3 separates preview visibility from execution eligibility:
+
+- Manual previews and preview-mode lifecycle plans can display busy snapshots
+  with a `blocked` reason; automatic quarantine and move() keep pending guards.
+- `status` groups live pending tools without mutating leases. Schema 1 and
+  native hook definitions are unchanged.
+- Eleven new isolated regressions cover the CLI under a matching pending Hook
+  fixture, exact path/bytes/plan ID, preview preservation, refusal to apply while
+  busy, normal completion and expiry, modified fingerprints, session/turn and
+  retention filters, lifecycle modes, and read-only pending diagnostics.
+- The CLI fixture test reproduced empty candidates against 0.1.2 before the
+  implementation change. All 82 cases pass locally on macOS / Python 3.11.4;
+  package checks pass. All cleanup operations in these tests use isolated
+  temporary data and files, never actual user scratch or caches.
+
+These are unit/subprocess fixture results, not new native dispatch acceptance.
+The active desktop remains on 0.1.2. Candidate 0.1.3 has not yet been published,
+installed, tested in the CI matrix, or accepted for native Stop/SessionEnd.
+Its pending guard intentionally remains strict: an apply command invoked as a
+native tool can block itself; it must not bypass a lease to perform a move.
+
 ## Local evidence
 
 - 71 unittest cases passed on macOS / Python 3.11.4.

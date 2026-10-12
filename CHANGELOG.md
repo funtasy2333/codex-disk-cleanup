@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.3 — Unreleased (2026-10-12)
+
+- Fix manual previews omitting a tracked file when the preview command itself
+  has a native PreToolUse pending lease. Candidate snapshots retain path,
+  fingerprint, bytes and plan ID; `blocked` explains pending execution guards.
+- Separate preview visibility from permission to move. Apply and automatic
+  quarantine still refuse any session with a live pending tool. No leases are
+  ignored, deleted or forged to make a command pass.
+- Preview-mode lifecycle events can show blocked candidates; quarantine-mode
+  events report pending skips. Session, turn, retention and fingerprint checks
+  remain in force. Byte totals include blocked candidates.
+- Add read-only `pending_sessions` diagnostics and 11 regression cases using
+  isolated fixtures. No schema, existing policy or native hook definition change.
+
 ## 0.1.2 — 2026-10-11
 
 - Set SessionEnd timeout to the native 3-second maximum, removing the loader

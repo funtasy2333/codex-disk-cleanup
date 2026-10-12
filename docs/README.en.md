@@ -6,6 +6,11 @@ A local Codex plugin for evidence-based scratch-file lifecycle management.
 Python 3.10+, standard library only. Version 0.1.2 fixes native hook registration and SessionEnd timeout compatibility; it is
 not a claim of long-term production stability.
 
+Source candidate 0.1.3 fixes a preview command's own pending lease hiding the
+selected session's candidates and reports execution blockers. The Git install
+commands below still reference published 0.1.2. Publication, installation and
+native acceptance of 0.1.3 remain outstanding.
+
 ## Install
 
 ```sh
@@ -57,6 +62,20 @@ On Windows use `py -3` and PowerShell path variable syntax. Plain `quick` and
 `deep` only preview. Plans expire in 15 minutes and cannot be replayed. Apply
 revalidates policy, metadata, SHA-256 and pending tools. `--session SESSION_ID`
 selects a specific session; without it, manual plans skip active sessions.
+
+From 0.1.3, manual previews display pending candidates with exact paths, bytes
+and plan IDs. `blocked` lists paths currently prevented from being moved;
+`bytes` includes these candidates and does not mean immediately reclaimable
+space. Fingerprint, retention and session checks still apply. Read-only status
+adds `pending_sessions`, grouping live tools and oldest timestamps by session.
+The existing `pending` count includes all records, including expired leases
+awaiting normal Hook housekeeping.
+
+Apply still refuses live pending tools, including a native apply command's own
+tool lease. Wait for tools to finish, then use an authorized lifecycle flow or
+a separate terminal. Never delete pending records to bypass the guard.
+Preview-mode lifecycle plans also display blocked candidates; automatic
+quarantine plans skip them with a reason.
 
 Default auto mode is **preview**. To explicitly enable reversible automatic
 cleanup run `init --auto quarantine`; `init --auto preview` disables it again.

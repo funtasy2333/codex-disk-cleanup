@@ -17,7 +17,8 @@ verified installed identity, report the limitation rather than inventing a path.
 Missing state does not mean cleanup has run successfully. Hooks must appear in
 the native registry and be reviewed/trusted before dispatch can be confirmed.
 
-1. `status` shows policy, tracked files and quarantine IDs.
+1. `status` shows policy, tracked files, quarantine IDs and `pending_sessions`
+   (live tool counts and oldest timestamps). `pending` counts all stored leases.
 2. `dry-run --scope quick` previews tracked disposable files.
 3. `dry-run --scope deep` also previews explicitly configured old cache/log files.
 4. `quick --apply PLAN_ID --yes` or `deep --apply PLAN_ID --yes` moves the reviewed
@@ -29,6 +30,17 @@ the native registry and be reviewed/trusted before dispatch can be confirmed.
    does not reclaim disk space.
 7. `recover` reconciles interrupted operations. Show `needs-review` records to the
    user; do not delete ambiguous files or edit the database to clear them.
+
+Use `--session ACTUAL_SESSION_ID` to preview the current session; without it,
+manual previews skip active sessions. Manual previews include pending candidates
+and list them in `blocked`, preserving exact paths, fingerprints, bytes and plan
+IDs. `bytes` includes blocked candidates. Preview visibility does not authorize
+execution: apply and automatic quarantine still recheck and refuse live pending
+tools. Do not delete leases or bypass that guard. A native apply command can be
+blocked by its own tool lease; report the reason and use the supported lifecycle
+flow or a separate terminal after tools finish, within the user's authorization.
+Preview-mode lifecycle plans also show pending candidates; quarantine-mode plans
+skip them with a reason. Neither mode relaxes session, turn or retention filters.
 
 Put disposable intermediate files in the scratch path supplied by SessionStart.
 Use literal file paths in tool arguments. Hooks do not inspect command outputs
