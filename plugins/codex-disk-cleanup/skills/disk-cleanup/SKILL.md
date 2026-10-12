@@ -42,8 +42,8 @@ flow or a separate terminal after tools finish, within the user's authorization.
 Preview-mode lifecycle plans also show pending candidates; quarantine-mode plans
 skip them with a reason. Neither mode relaxes session, turn or retention filters.
 
-Put disposable intermediate files in the scratch path supplied by SessionStart.
-Prefer literal paths in tool arguments. Matching Hooks also compare bounded
+Scratch supplied by SessionStart is optional. Do not require the conversation
+to relocate all intermediates as the only way to obtain coverage. Matching Hooks also compare bounded
 directory snapshots inside managed roots, so dynamic paths can be tracked
 without inspecting command outputs or evaluating code. Keep final deliverables and permanent tests in the
 user's workspace. `test_*` scratch files have zero retention and can be moved at
@@ -57,9 +57,8 @@ as a side effect of a status/preview request. Installation does not enable auto
 quarantine; the default is preview.
 
 
-Before a file-producing task, choose locations by purpose. Put disposable scripts,
-crops, render verification images, reference contact sheets and staging copies in
-the injected scratch. Keep final outputs, reusable/editable source assets, source
+Before a file-producing task, choose locations by purpose. Disposable scripts, crops, render checks and staging copies may use optional
+scratch or their actual dedicated system-temporary directory. Keep final outputs, reusable/editable source assets, source
 prompts, regression tests and audit evidence in the project. A source attempt
 explicitly retained for audit is not disposable solely because it is superseded.
 
@@ -77,8 +76,8 @@ Status reports project_scratch and project_scratch_errors. Each enrollment binds
 a root identity to one session; changed/missing roots fail closed and remain
 removable via unenroll. Matching Pre/Post snapshots cover at most 2000 combined
 entries per phase. Overflow, access failures, overlapping turns or legacy pending
-calls disable dynamic coverage and record coverage-skipped; literal creation
-evidence remains usable. Do not describe all creations as tracked without
+calls suspend new adoption, including literal destinations, and record
+coverage-skipped. Do not describe all creations as tracked without
 checking status. Existing project files can be listed as review candidates, but
 never retroactively manufacture Hook tracking records for them.
 
@@ -93,3 +92,33 @@ authorization: its original path may still be used by the conversation or image
 edits. No match means no backup verified. Keep source copies outside Codex home.
 Do not enroll generated_images as project scratch or fabricate creation evidence
 for existing host images.
+
+Automatic temporary discovery uses literal input references to a previously absent
+dedicated subdirectory under canonical OS temp bases; it never scans the entire
+temp base, evaluates code or infers ownership from output. Matching Pre/Post need
+actual session/call/turn plus stable parent/base/root identities. Existing or shared
+directories are not automatically adopted. First-call contents are review-only;
+only later fully observed creations can become tracked. All discovered-root files
+retain seven days even when named test_*. Partial failures confer no file ownership.
+
+Status includes discover_temp, discovered_temp, discovered_temp_errors and
+review_candidates. Review candidates contain metadata only and create no plan or
+cleanup authority; do not claim arbitrary project outputs are all observed. Another
+session's explicit temp access blocks moves and invalidates overlapping creation
+evidence. Unknown random temp directories remain outside automatic ownership.
+Limits:16 roots/session,2000 global root/review records,2000 entries/phase.
+
+Only change discovery when requested: init --discover-temp on|off preserves auto.
+Disabling revokes discovery-based move plans without moving files, and allows
+restore. forget-temp --root ABS --yes withdraws a root only after reviewing the
+request; it keeps files and tracking records and refuses unresolved quarantine.
+Never retroactively adopt existing historical directories. New
+optional schema1 tables do not change old read-only status or justify DB editing.
+
+Withdrawal's quarantine guard and metadata deletion share an immediate SQLite
+transaction, preventing a concurrent move from losing restore authority. Explicit
+project enrollment rejects overlap with persisted discovered roots. Execution
+rechecks the on-disk discovery switch; another process can revoke old plans.
+Review-only observations exclude Codex home (including a custom CODEX_HOME) and
+plugin state. Oversized literal inputs are not silently truncated: an unknown
+access lease blocks every move and invalidates concurrent creation evidence.

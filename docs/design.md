@@ -80,3 +80,35 @@ so a rename cannot silently become an unbounded cross-volume copy.
 
 The implementation is a trusted-user maintenance tool. It deliberately does not
 claim a hostile-process filesystem sandbox. See SECURITY.md for races and leases.
+
+## Automatic temporary observation (0.1.5 candidate)
+
+Literal extraction is performed once per Hook. Pre discovers only the first
+missing path component under a canonical OS temp base, with a stable existing
+parent. Post must find a safe directory and match session/call/turn, parent/base
+identity, allowed base and overlap/root-count limits. The directory policy binds
+root identity and seven-day retention; its initial contents enter a metadata-only
+review queue. Failed first calls may bind directories but cannot own files. Later
+complete Pre/Post snapshots reuse existing adoption checks. Existing directories
+or randomly generated paths absent from inputs do not gain discovery authority.
+
+Optional discovered_temp/review_candidates tables preserve schema1 readers.
+Read-only status does not add absent tables. Review observations have no content
+hash and never enter executable plans. Config discover_temp defaults true and is
+independent of auto. Disable revokes move plans; restore remains possible.
+Forget withdraws metadata but refuses unresolved quarantine to preserve restore.
+
+Foreign-session literal/cwd temp references are durable pending metadata. They
+block moves and invalidate both calls' creation evidence when observations
+overlap, including when the foreign writer finishes first. Pending metadata is
+kept for execution guards even after creation evidence is invalidated. Root/base
+replacement and policy withdrawal fail closed. Bounds:16 roots/session,2000
+global roots/queue rows,2000 entries shared per phase; no whole-temp traversal.
+
+Withdrawal's quarantine guard and metadata deletion share an immediate SQLite
+transaction, preventing a concurrent move from losing restore authority. Explicit
+project enrollment rejects overlap with persisted discovered roots. Execution
+rechecks the on-disk discovery switch; another process can revoke old plans.
+Review-only observations exclude Codex home (including a custom CODEX_HOME) and
+plugin state. Oversized literal inputs are not silently truncated: an unknown
+access lease blocks every move and invalidates concurrent creation evidence.

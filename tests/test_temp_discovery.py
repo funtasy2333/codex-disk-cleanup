@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -303,6 +304,105 @@ class TempDiscoveryTests(unittest.TestCase):
         self.store.restore(mid)
         self.store.forget_temp(self.root)
         self.assertEqual(self.store.status()['discovered_temp'], [])
+
+    def test_concurrent_forget_and_apply_cannot_orphan_quarantine(self):
+        self.discover()
+        path = self.create()
+        plan = self.eligible()
+        original = self.store.db
+        completed = threading.Event()
+        results, errors, threads = [], [], []
+        def competing_apply():
+            try:
+                with contextlib.closing(c.Store(self.store.data)) as other:
+                    results.append(other.apply(plan['plan_id']))
+            except Exception as e:
+                errors.append(e)
+            finally:
+                completed.set()
+        class Cursor:
+            def __init__(self, cursor):
+                self.cursor = cursor
+            def fetchone(self):
+                answer = self.cursor.fetchone()
+                thread = threading.Thread(target=competing_apply)
+                threads.append(thread)
+                thread.start()
+                completed.wait(0.2)
+                return answer
+        class Connection:
+            def execute(self, sql, *args):
+                cursor = original.execute(sql, *args)
+                return Cursor(cursor) if sql.startswith('SELECT 1 FROM moves WHERE root=') else cursor
+            def __getattr__(self, name):
+                return getattr(original, name)
+        self.store.db = Connection()
+        self.store.forget_temp(self.root)
+        for thread in threads:
+            thread.join(5)
+            self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(results[0]['quarantined'], [])
+        self.assertTrue(path.exists())
+
+    def test_argument_overflow_blocks_foreign_pending_file_move(self):
+        self.discover()
+        path = self.create()
+        plan = self.eligible()
+        command = 'python helper.py ' + ' '.join(f'/aaa-fixture-{n:04d}' for n in range(c.MAX_ITEMS))
+        command += ' ' + str(path)
+        self.store.hook(self.payload('PreToolUse', command, session='s2', call='large'))
+        self.assertEqual(self.store.apply(plan['plan_id'])['quarantined'], [])
+        self.assertTrue(path.exists())
+
+    def test_argument_overflow_invalidates_other_pending_creation_evidence(self):
+        self.discover()
+        owner = self.payload('PreToolUse', 'python helper.py', call='owner')
+        self.store.hook(owner)
+        path = self.root / 'foreign.txt'
+        command = 'python helper.py ' + ' '.join(f'/aaa-fixture-{n:04d}' for n in range(c.MAX_ITEMS))
+        command += ' ' + str(path)
+        foreign = self.payload('PreToolUse', command, session='s2', call='large')
+        self.store.hook(foreign)
+        path.write_text('foreign output')
+        foreign['hook_event_name'] = 'PostToolUse'
+        self.store.hook(foreign)
+        owner['hook_event_name'] = 'PostToolUse'
+        self.store.hook(owner)
+        self.assertEqual(self.store.status()['tracked'], [])
+
+    def test_project_enrollment_cannot_shadow_discovered_root_restore(self):
+        self.discover()
+        path = self.create()
+        mid = self.store.apply(self.eligible()['plan_id'])['quarantined'][0]
+        child = self.root / 'child'
+        child.mkdir()
+        with self.assertRaises(c.Refused):
+            self.store.enroll(self.system, child, 's1', 7)
+        with contextlib.closing(c.Store(self.store.data)) as again:
+            again.restore(mid)
+        self.assertTrue(path.exists())
+
+    def test_custom_codex_home_is_excluded_from_project_observations(self):
+        path = self.project / 'private-note.txt'
+        payload = self.payload('PreToolUse')
+        payload['tool_input'] = {'path': str(path)}
+        with patch.dict(os.environ, CODEX_HOME=str(self.project)):
+            self.store.hook(payload)
+            path.write_text('Codex data')
+            payload['hook_event_name'] = 'PostToolUse'
+            self.store.hook(payload)
+        self.assertEqual(self.store.status()['review_candidates'], [])
+
+    def test_other_instance_disable_revokes_cached_store_plan(self):
+        self.discover()
+        path = self.create()
+        plan = self.eligible()
+        with contextlib.closing(c.Store(self.store.data)) as other:
+            other.config['discover_temp'] = False
+            other.save_config()
+        self.assertEqual(self.store.apply(plan['plan_id'])['quarantined'], [])
+        self.assertTrue(path.exists())
 
     def test_post_with_wrong_turn_cannot_adopt_dynamic_file(self):
         self.discover()

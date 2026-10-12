@@ -3,12 +3,14 @@
 [中文](../README.md)
 
 A local Codex plugin for evidence-based scratch-file lifecycle management.
-Python 3.10+, standard library only. Version 0.1.3 fixes pending tool leases hiding the current session from previews,
-while retaining execution guards. Long-term reliability is not established.
+Python 3.10+, standard library only. Published version: **0.1.4**. This branch
+contains an unreleased, uninstalled **0.1.5 source candidate** that discovers new
+dedicated session temporary directories; scratch becomes optional. Preview is the
+default. Explicit quarantine mode moves files into reversible quarantine;
+permanent deletion is separate.
 
-The release adds execution blockers and pending-session diagnostics. All 82
-isolated tests pass. Native acceptance of the new version requires a fresh
-session after upgrading and restarting; see the validation record.
+All 182 isolated candidate tests pass. Cross-platform CI and upgraded native
+Hook acceptance remain outstanding; see the validation record.
 
 ## Install
 
@@ -90,6 +92,49 @@ session activity leases last 24 hours. SessionStart sweeps only ended or stale
 sessions. For unusually long-running jobs, keep preview mode enabled.
 Dynamic shell/code paths and outputs are not evaluated. Deliverables and
 permanent tests belong in the project, not scratch.
+
+## 0.1.5 source candidate: observe actual temporary locations
+
+Published/installed 0.1.4 remains unchanged. This candidate has not been released,
+installed or accepted through native desktop dispatch. Scratch is optional:
+literal tool-input paths can identify new dedicated OS temporary directories.
+Pre pins an absent candidate and existing parent/base identities; matching Post
+checks session, call, turn and the safe new directory identity. Only stdlib OS
+temporary bases and the canonical POSIX /tmp alias are permitted. No whole-temp
+scan, code evaluation or tool-output ownership inference occurs. Existing/shared
+directories and random directories not mentioned in inputs are not adopted.
+
+Initial contents are metadata-only review candidates, never cleanup-owned.
+Subsequent complete bounded snapshots can track new files. A failed first call
+may bind a directory but cannot adopt its contents; later failed calls do not
+adopt new output. Discovery uses seven-day retention even for test_* filenames.
+Pending, protected-path, Git/link/hardlink, fingerprint and reversible quarantine
+checks remain. Another session's explicit temp-root access also blocks moves
+and invalidates overlapping creation evidence, even if that tool finishes first.
+
+Each phase shares 2000 directory entries. At most16 discovered roots per session
+and2000 global root records/2000 review observations are retained. Incomplete,
+ambiguous, mismatched or changed-root evidence fails closed. Oversized tool inputs
+retain an unknown-access pending lease that blocks all moves until completion,
+and invalidate concurrent creation evidence. `status` exposes
+`discover_temp`, `discovered_temp`, `discovered_temp_errors`, `review_candidates`.
+Review-only observations of explicit ordinary project paths do not read/hash
+contents or produce executable plans. The separate `generated-preview` remains
+read-only; no complete arbitrary-project or generated-image tracking is claimed.
+
+```sh
+python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" init --discover-temp off
+python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" init --discover-temp on
+python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" forget-temp --root /absolute/temp/task --yes
+```
+
+Discovery defaults on for future candidate-version calls; changing it preserves
+auto mode and other policy. Disable revokes discovery-based move plans but allows
+restore. Forget is metadata-only and refuses roots with unresolved quarantine:
+restore, explicitly purge or reconcile first. Optional schema1 state tables keep
+old read-only data working without initialization. Existing historical temp
+folders are not retroactively adopted. Full native lifecycle and cross-platform
+acceptance of this candidate remain separate checks.
 
 ## 0.1.4: project scratch and dynamic paths
 

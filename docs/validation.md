@@ -1,5 +1,30 @@
 # Validation
 
+## 0.1.5 source candidate — 2026-10-12
+
+182 isolated unittest cases pass locally on macOS/Python3.11.4, including 49 new
+cases for automatic literal system-temp discovery, dynamic Python subprocess
+creations without scratch relocation, initial/preexisting file preservation,
+seven-day retention, normal quarantine/restore/purge, pending and foreign-session
+read/writer overlap, writer-finishes-first invalidation, wrong/missing turns,
+parent/root replacement, config disable, metadata withdrawal, unrestored
+quarantine protection, alias/link/Git/Codex boundaries, count/proposal limits,
+snapshot overflow, metadata-only observations and old read-only schema1 state.
+Six additional failures were reproduced before the final fix: concurrent forget/
+apply, literal overflow blocking moves, overflow invalidating another writer's
+creation evidence, enrollment overlap preserving restore, custom Codex-home
+exclusion and another instance disabling a previously cached executable plan.
+These six regressions now pass, with the full 182-case suite.
+New ownership failures were reproduced before implementation/fixes and pass now.
+All fixture cleanup is isolated; actual user temp/project/generated-image files
+were not enrolled, modified, adopted, moved or deleted. Current installed runtime
+remains0.1.4 with the user's quarantine policy, unchanged by candidate work.
+
+These checks are source/subprocess evidence. Cross-platform CI, full native
+Hook dispatch/performance and Stop/SessionEnd acceptance of0.1.5 remain pending.
+No publication/installation is inferred from a source modification request.
+
+
 Version: 0.1.4. Research/development dates: 2026-10-10–12.
 
 ## v0.1.4 release preparation — coverage improvement

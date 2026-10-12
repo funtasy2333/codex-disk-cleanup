@@ -85,3 +85,30 @@ generated-preview --session ACTUAL_UUID --copy-root ABS_ARCHIVE to inspect
 this exact session source directory and SHA-256 matching project copies. This
 read-only command creates no state, tracking or executable plan; copies do not
 prove originals are unused by conversation viewing or editing.
+
+## Automatic temp discovery — 0.1.5 source candidate
+
+Scratch is optional. Matched Hooks can discover explicitly referenced new OS
+temporary subdirectories and bind parent/base/root identity to a session. Initial
+contents are metadata-only review candidates; later complete matching snapshots
+can own new files at seven-day retention. Existing/shared or unreferenced random
+directories are not adopted. No broad scan or tool-output inference.
+
+Foreign-session explicit temp access blocks moves and invalidates overlapping
+creation evidence. Scope limits:16 roots/session,2000 global roots and review
+observations,2000 combined directory entries per phase. Existing pending, Git,
+protected-path, identity and fingerprint guards remain. Status exposes
+discovered_temp/errors and review_candidates; review rows do not authorize moves.
+
+`init --discover-temp on|off` preserves auto mode. Default discovery is on; auto
+still defaults to preview. `forget-temp --root ABS --yes` revokes metadata only
+and refuses unresolved quarantine so restore access is not orphaned. Old schema1
+read-only status needs no new tables. Candidate native dispatch/CI are unverified.
+
+Withdrawal's quarantine guard and metadata deletion share an immediate SQLite
+transaction, preventing a concurrent move from losing restore authority. Explicit
+project enrollment rejects overlap with persisted discovered roots. Execution
+rechecks the on-disk discovery switch; another process can revoke old plans.
+Review-only observations exclude Codex home (including a custom CODEX_HOME) and
+plugin state. Oversized literal inputs are not silently truncated: an unknown
+access lease blocks every move and invalidates concurrent creation evidence.

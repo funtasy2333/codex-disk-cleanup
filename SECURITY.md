@@ -67,3 +67,28 @@ For suspected data loss or security defects, disable automatic mode (`init
 --auto preview`), retain state/quarantine, and use GitHub's private vulnerability
 reporting if available. Do not publish authentication files or private local
 paths in public issues. Ordinary non-sensitive bugs can be reported in issues.
+
+## Observed system-temporary roots (0.1.5 candidate)
+
+The user's requested discovery policy authorizes future observed dedicated
+OS-temp subdirectories, not a whole-temp maintenance scan. Missing-path evidence
+and stable existing-parent/base/root identities are required across matching
+call/session/turn events. Discovery records are bounded and separate from user
+configuration. Initial contents and outside project paths are review-only metadata;
+they never confer deletion rights. Existing/shared roots, output-only references,
+links, Git and protected data remain excluded.
+
+Observed foreign-session access prevents moves and overlapping creation adoption.
+This is advisory Hook evidence, not a process-level filesystem watcher or hostile
+concurrency sandbox; references absent from inputs/cwd cannot be attributed. The
+24-hour lease and existing fingerprint/race limits still apply. Disable revokes
+new moves; forgetting refuses unresolved quarantine. No automatic permanent or
+recursive deletion, no retroactive real-user directory adoption.
+
+Withdrawal's quarantine guard and metadata deletion share an immediate SQLite
+transaction, preventing a concurrent move from losing restore authority. Explicit
+project enrollment rejects overlap with persisted discovered roots. Execution
+rechecks the on-disk discovery switch; another process can revoke old plans.
+Review-only observations exclude Codex home (including a custom CODEX_HOME) and
+plugin state. Oversized literal inputs are not silently truncated: an unknown
+access lease blocks every move and invalidates concurrent creation evidence.

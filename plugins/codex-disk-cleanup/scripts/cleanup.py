@@ -341,21 +341,26 @@ class Store:
     def enroll(self, project, root, session, days):
         spec = self.validate_project_root({"project": str(project), "path": str(root),
                                           "session": session, "days": days}, capture_identity=True)
-        existing = self.config.get("project_scratch", [])
-        if len(existing) >= 16:
-            raise Refused("project scratch root limit reached")
-        for old in existing:
-            if not isinstance(old, dict) or not isinstance(old.get("path"), str):
-                raise Refused("invalid enrollment; remove it before adding roots")
-            p = Path(old["path"])
-            if p.is_relative_to(Path(spec["path"])) or Path(spec["path"]).is_relative_to(p):
-                raise Refused("root already enrolled or overlaps another enrollment")
-        # Enrollment authorizes future observed creations, never adopts existing files.
-        self.config["project_scratch"] = [*existing, spec]
-        self.save_config()
-        self.project_roots.append(spec)
-        self.audit("enroll", spec)
-        return {"enrolled": spec, "note": "Existing files are not adopted. Auto mode is unchanged."}
+        with self.transaction():
+            for old in self.db.execute('SELECT path FROM discovered_temp'):
+                p = Path(old['path'])
+                if p.is_relative_to(Path(spec['path'])) or Path(spec['path']).is_relative_to(p):
+                    raise Refused('project enrollment overlaps a discovered temporary root')
+            existing = self.config.get("project_scratch", [])
+            if len(existing) >= 16:
+                raise Refused("project scratch root limit reached")
+            for old in existing:
+                if not isinstance(old, dict) or not isinstance(old.get("path"), str):
+                    raise Refused("invalid enrollment; remove it before adding roots")
+                p = Path(old["path"])
+                if p.is_relative_to(Path(spec["path"])) or Path(spec["path"]).is_relative_to(p):
+                    raise Refused("root already enrolled or overlaps another enrollment")
+            # Enrollment authorizes future observed creations, never adopts existing files.
+            self.config["project_scratch"] = [*existing, spec]
+            self.save_config()
+            self.project_roots.append(spec)
+            self.audit("enroll", spec)
+            return {"enrolled": spec, "note": "Existing files are not adopted. Auto mode is unchanged."}
 
     def unenroll(self, root):
         path = str(root.expanduser().resolve())
@@ -369,9 +374,29 @@ class Store:
         self.audit("unenroll", {"path": path})
         return {"unenrolled": path, "note": "Files and tracking records are retained; old plans lose authorization."}
 
+    def discovery_enabled(self):
+        # Plans must honor revocation by another process, not a cached config.
+        try:
+            path = self.data / 'config.json'
+            safe_components(path)
+            if not os.path.lexists(path):
+                return True
+            identity = path.lstat()
+            if not stat.S_ISREG(identity.st_mode) or identity.st_nlink != 1:
+                return False
+            config = json.loads(path.read_text(encoding='utf-8'))
+            return (isinstance(config, dict) and config.get('schema') == 1
+                    and config.get('discover_temp', True) is True)
+        except (ValueError, OSError):
+            return False
+
+    def private_observation_path(self, path):
+        codex = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))).resolve()
+        return path == codex or path.is_relative_to(codex) or path == self.data or path.is_relative_to(self.data)
+
     def managed_roots(self, session):
         self.load_temp_roots()
-        temp = self.temp_roots if self.config.get('discover_temp', True) else []
+        temp = self.temp_roots if self.discovery_enabled() else []
         return [(self.workspace(session), None), *[(Path(s["path"]), s)
                    for s in [*self.project_roots, *temp] if s['session'] == session]]
 
@@ -445,14 +470,15 @@ class Store:
 
     def forget_temp(self, root):
         path = str(Path(os.path.abspath(root)))
-        if self.db.execute("SELECT 1 FROM moves WHERE root=? AND state NOT IN "
-                           "('restored','purged','cancelled') LIMIT 1", (path,)).fetchone():
-            raise Refused('restore, purge or reconcile quarantine before forgetting its root')
-        cursor = self.db.execute('DELETE FROM discovered_temp WHERE path=?', (path,))
-        if not cursor.rowcount:
-            raise Refused('temporary root is not discovered')
-        self.load_temp_roots()
-        self.audit('temp-forgotten', {'path': path})
+        with self.transaction():
+            if self.db.execute("SELECT 1 FROM moves WHERE root=? AND state NOT IN "
+                               "('restored','purged','cancelled') LIMIT 1", (path,)).fetchone():
+                raise Refused('restore, purge or reconcile quarantine before forgetting its root')
+            cursor = self.db.execute('DELETE FROM discovered_temp WHERE path=?', (path,))
+            if not cursor.rowcount:
+                raise Refused('temporary root is not discovered')
+            self.load_temp_roots()
+            self.audit('temp-forgotten', {'path': path})
         return {'forgotten': path, 'note': 'Metadata only; files and tracking remain, old plans are revoked.'}
 
     def literal_paths(self, payload):
@@ -485,7 +511,9 @@ class Store:
             aliases.append(Path('/tmp'))
         aliases = [(p, p.resolve()) for p in sorted(aliases, key=lambda p: len(p.parts), reverse=True)
                    if p.resolve() in bases]
-        for name in sorted(names)[:MAX_ITEMS]:
+        if len(names) > MAX_ITEMS:
+            raise Refused('tool input exceeds literal path coverage limit')
+        for name in sorted(names):
             if not name or len(name) > 4096 or any(c in name for c in ('\0', '\n', '$', '`')):
                 continue
             path = Path(os.path.abspath(Path(name) if Path(name).is_absolute() else Path(cwd) / name))
@@ -498,7 +526,7 @@ class Store:
         return sorted(paths, key=str)
 
     def discovery_pre(self, payload, roots, literals=None):
-        if not self.config.get('discover_temp', True) or not isinstance(payload.get('turn_id'), str) or not payload['turn_id']:
+        if not self.discovery_enabled() or not isinstance(payload.get('turn_id'), str) or not payload['turn_id']:
             return []
         proposals = {}
         bases = sorted(self.temporary_bases(), key=lambda p: len(p.parts), reverse=True)
@@ -541,7 +569,7 @@ class Store:
             try:
                 permitted = (cwd is not None and path != cwd and path.is_relative_to(cwd)) or any(
                     path != b and path.is_relative_to(b) for b in bases)
-                if not permitted or any(path == r or path.is_relative_to(r) for r, _ in roots):
+                if self.private_observation_path(path) or not permitted or any(path == r or path.is_relative_to(r) for r, _ in roots):
                     continue
                 self.candidate(path, Path(path.anchor))
                 if not os.path.lexists(path):
@@ -556,7 +584,7 @@ class Store:
             paths.update(self.literal_paths({'cwd': payload['cwd'],
                                             'tool_input': {'path': payload['cwd']}}))
         bases = self.temporary_bases()
-        return [str(p) for p in sorted(paths, key=str)[:MAX_ITEMS]
+        return [str(p) for p in sorted(paths, key=str)
                 if any(p == base or p.is_relative_to(base) for base in bases)]
 
     def pending_temp_paths(self):
@@ -567,9 +595,18 @@ class Store:
             paths.update(Path(p) for p in references if isinstance(p, str) and Path(p).is_absolute())
         return paths
 
+    def pending_unknown_access(self):
+        for row in self.db.execute('SELECT paths FROM pending WHERE created>?', (time.time() - LEASE,)):
+            evidence = json.loads(row[0])
+            if isinstance(evidence, dict) and evidence.get('incomplete_access'):
+                return True
+        return False
+
     def record_review(self, path, session, reason, turn):
         try:
             path = self.candidate(Path(path), Path(Path(path).anchor))
+            if self.private_observation_path(path):
+                return
             identity = path.lstat()
             if not stat.S_ISREG(identity.st_mode) or identity.st_nlink != 1 or identity.st_size > MAX_BYTES:
                 return
@@ -587,7 +624,7 @@ class Store:
             pass
 
     def discovery_post(self, evidence, payload, budget):
-        if not self.config.get('discover_temp', True):
+        if not self.discovery_enabled():
             return
         session = payload['session_id']
         for proposal in evidence.get('temp_candidates', []):
@@ -699,7 +736,7 @@ class Store:
                 spec = item['temp_policy']
                 row = self.db.execute('SELECT policy FROM discovered_temp WHERE path=?',
                                       (spec['path'],)).fetchone()
-                if (not self.config.get('discover_temp', True) or not row
+                if (not self.discovery_enabled() or not row
                         or json.loads(row[0]) != spec or spec['session'] != item['session']):
                     raise Refused('temporary discovery policy changed or disabled')
                 self.validate_temp_root(spec)
@@ -744,7 +781,14 @@ class Store:
                 if not isinstance(call, str) or not call:
                     return {"ignored": "missing tool_use_id"}
                 roots = self.managed_roots(session)
-                literals = self.literal_paths(payload)
+                incomplete_access = False
+                try:
+                    literals = self.literal_paths(payload)
+                    temp_access = self.temp_access(payload, literals)
+                except (ValueError, OSError) as e:
+                    literals, temp_access = [], []
+                    incomplete_access = True
+                    self.audit('coverage-skipped', {'session': session, 'reason': str(e)})
                 paths = sorted({p for managed, _ in roots
                                 for p in self.candidates(payload, managed, literals=literals)})[:MAX_ITEMS]
                 if event == "PreToolUse":
@@ -760,16 +804,17 @@ class Store:
                     snapshots = []
                     temp_candidates = self.discovery_pre(payload, roots, literals)
                     outside_absent = self.outside_pre(payload, roots, literals)
-                    temp_access = self.temp_access(payload, literals)
                     temp_frames = [r for r, policy in roots
                                    if policy and policy.get('kind') == 'discovered-temp']
                     temp_frames.extend(Path(p['path']) for p in temp_candidates)
                     turn = payload.get("turn_id")
-                    ambiguous = False
+                    ambiguous = incomplete_access
                     for pending in self.db.execute("SELECT session,call,paths FROM pending WHERE created>?",
                                                    (now - LEASE,)).fetchall():
                         prior = json.loads(pending["paths"])
-                        if pending['session'] == session:
+                        if incomplete_access or (isinstance(prior, dict) and prior.get('incomplete_access')):
+                            overlaps = True
+                        elif pending['session'] == session:
                             overlaps = not isinstance(prior, dict) or prior.get('turn') != turn
                         else:
                             prior_access = prior if isinstance(prior, list) else prior.get('temp_access', [])
@@ -790,6 +835,9 @@ class Store:
                                 prior['temp_candidates'] = []
                                 self.db.execute("UPDATE pending SET paths=? WHERE session=? AND call=?",
                                                 (compact(prior), pending['session'], pending["call"]))
+                            else:
+                                self.db.execute("UPDATE pending SET paths='[]' WHERE session=? AND call=?",
+                                                (pending['session'], pending['call']))
                     if ambiguous:
                         temp_candidates = []
                         self.audit("coverage-skipped", {"session": session,
@@ -827,6 +875,7 @@ class Store:
                                                                  'temp_candidates': temp_candidates,
                                                                  'outside_absent': outside_absent,
                                                                  'temp_access': temp_access,
+                                                                 'incomplete_access': incomplete_access,
                                                                  "literal_identities": literal_identities})))
                     return {"observed": len(absent)}
                 row = self.db.execute("SELECT paths FROM pending WHERE session=? AND call=?",
@@ -835,6 +884,8 @@ class Store:
                 count = 0
                 if row:
                     evidence = json.loads(row[0])
+                    if incomplete_access or (isinstance(evidence, dict) and evidence.get('incomplete_access')):
+                        return {'tracked': 0}
                     if isinstance(evidence, dict) and evidence.get('turn') != payload.get('turn_id'):
                         self.audit('coverage-skipped', {'session': session,
                             'reason': 'PostToolUse turn does not match creation evidence'})
@@ -940,6 +991,7 @@ class Store:
             busy = {r["session"] for r in self.db.execute("SELECT session FROM pending WHERE created>?",
                                                         (now - LEASE,))}
             temp_access = self.pending_temp_paths()
+            unknown_access = self.pending_unknown_access()
             for r in self.db.execute("SELECT * FROM tracked ORDER BY created LIMIT ?", (MAX_ITEMS,)):
                 if stale_only and r["session"] in active:
                     continue
@@ -958,11 +1010,12 @@ class Store:
                 if retention is None or now - r["created"] < retention:
                     continue
                 obstruction = {"path": r["path"], "reason": "session has a pending tool"}
-                busy_root = bool(temp_policy and any(p == Path(temp_policy['path']) or
+                busy_root = unknown_access or bool(temp_policy and any(p == Path(temp_policy['path']) or
                                  p.is_relative_to(Path(temp_policy['path'])) or
                                  Path(temp_policy['path']).is_relative_to(p) for p in temp_access))
                 if busy_root:
-                    obstruction['reason'] = 'temporary root has a pending tool access'
+                    obstruction['reason'] = ('pending tool access coverage is incomplete' if unknown_access
+                                             else 'temporary root has a pending tool access')
                 if (r["session"] in busy or busy_root) and not include_busy:
                     skipped.append(obstruction)
                     continue
@@ -1038,6 +1091,8 @@ class Store:
 
     def move(self, item):
         with self.transaction():
+            if self.pending_unknown_access():
+                raise Refused('pending tool access coverage is incomplete')
             root = self.root_for(item)
             p = self.candidate(Path(item["path"]), root)
             if item["kind"] == "tracked":
@@ -1179,7 +1234,7 @@ class Store:
                   "maintenance": self.roots, "tracked": [], "quarantine": [], "pending": 0,
                   "pending_sessions": [], "project_scratch": self.project_roots,
                   "project_scratch_errors": self.project_errors,
-                  'discover_temp': self.config.get('discover_temp', True),
+                  'discover_temp': self.discovery_enabled(),
                   'discovered_temp': self.temp_roots, 'discovered_temp_errors': self.temp_errors,
                   'review_candidates': []}
         if self.db is None:

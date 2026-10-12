@@ -23,15 +23,15 @@
 ### Task1: Implement discovery and review-only observation state
 Files: scripts/cleanup.py, tests/test_temp_discovery.py.
 Interfaces: Store.temporary_bases, temp_candidates(payload), validate_temp_root(spec), managed_roots(session), status discovery/observation fields.
-- [ ] Add failing discovery/first-call/old-directory/alias/protected/ambiguity/limits/old-state tests.
-- [ ] Run and inspect expected failures.
-- [ ] Add optional state tables and discovery helpers; integrate matched Hooks with stable identity and bounded observations.
-- [ ] Add lifecycle/retention/root-change/disable/forget/restore and actual subprocess failing tests; run red then implement plan/root/execution checks.
-- [ ] Run complete unittest suite and commit.
+- [x] Add failing discovery/first-call/old-directory/alias/protected/ambiguity/limits/old-state tests.
+- [x] Run and inspect expected failures.
+- [x] Add optional state tables and discovery helpers; integrate matched Hooks with stable identity and bounded observations.
+- [x] Add lifecycle/retention/root-change/disable/forget/restore and actual subprocess failing tests; run red then implement plan/root/execution checks.
+- [x] Run complete unittest suite and commit.
 
 ### Task2: Document and package candidate
 Files: runtime version, manifest, config example, SKILL, README Chinese+English, CHANGELOG, SECURITY, design and validation.
-- [ ] Make SessionStart scratch guidance optional and document exact automatic coverage limits.
-- [ ] Run unittest, package --check, git diff --check; build deterministic package.
-- [ ] Commit and independent whole-branch review; resolve important findings with red-green regressions.
-- [ ] Export source/patch/package/verification and retain the branch for user review.
+- [x] Make SessionStart scratch guidance optional and document exact automatic coverage limits.
+- [x] Run unittest, package --check, git diff --check; build deterministic package.
+- [x] Commit and independent whole-branch review; resolve important findings with red-green regressions.
+- [x] Export source/patch/package/verification and retain the branch for user review.

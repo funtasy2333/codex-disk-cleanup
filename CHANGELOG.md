@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.5 — Unreleased (2026-10-12)
+
+- Make scratch optional; observe literal referenced new dedicated system-temp
+  directories through matching session/call/turn and parent/base/root identity.
+- Keep first-call contents and explicit ordinary project paths review-only, using
+  metadata without content reads. Existing/shared temp directories are not adopted.
+- Reuse bounded snapshots, identity/pending/retention/plan guards and same-root
+  quarantine; discovered files retain seven days even for test_* names.
+- Guard foreign-session temp access and overlapping creation evidence; reject
+  mismatched/missing turns, changed roots, failed output ownership and broad scans.
+- Add optional schema1 discovery/review tables, status diagnostics, independent
+  discovery on/off configuration and metadata-only withdrawal; unresolved
+  quarantine must be handled before forgetting its root.
+- Make withdrawal atomic against moves, reject enrollment/discovery overlaps,
+  exclude custom Codex home from observations, refresh discovery revocation at
+  execution, and retain blocking pending leases for oversized tool inputs.
+- Add 49 isolated regressions; 182 local tests pass. Native host lifecycle and
+  cross-platform CI acceptance remain outstanding; candidate is not installed.
+
 ## 0.1.4 — 2026-10-12
 
 - Add explicit per-session enrollment of dedicated project scratch directories,
