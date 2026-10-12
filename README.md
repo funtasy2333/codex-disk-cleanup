@@ -4,9 +4,9 @@
 
 为本地 Codex 构建的临时文件生命周期插件。Python 3.10+，运行时只用标准库。
 
-**0.1.2 修复了 Hooks 注册及 SessionEnd 超时配置的兼容性问题，尚未经过长期使用验证。** 默认只预览；自动清理需显式启用，清理先移入隔离区，可恢复。永久删除是独立操作。源码、测试、CI 和安装包都在本仓库，GitHub 公开发布不等于已上架 OpenAI 公共插件目录。
+**0.1.3 修复了当前会话的 pending 工具记录导致预览候选消失的问题，保留隔离时的 pending 保护。** 默认只预览；自动清理需显式启用，清理先移入隔离区，可恢复。永久删除是独立操作。源码、测试、CI 和安装包都在本仓库，GitHub 公开发布不等于已上架 OpenAI 公共插件目录。
 
-源码候选版本 **0.1.3** 修复了预览命令自身的 pending 工具记录导致当前会话候选消失的问题，并显示阻止执行的原因。以下 Git 安装命令仍指向已发布的 0.1.2；0.1.3 的发布、安装和新版原生 Hooks 验收尚未完成。
+本版新增阻止执行的原因和 pending 会话诊断。82 项隔离测试通过；原生 Hooks 的新版验收需在升级重启后的新会话中完成，详见验收记录。
 
 [English](docs/README.en.md) · [安全边界](SECURITY.md) · [设计](docs/design.md) · [验收记录](docs/validation.md)
 
@@ -32,7 +32,7 @@
 在支持插件命令的 Codex CLI 中：
 
 ```sh
-codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.2
+codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.3
 codex plugin add codex-disk-cleanup@codex-disk-cleanup-marketplace
 ```
 

@@ -3,18 +3,17 @@
 [中文](../README.md)
 
 A local Codex plugin for evidence-based scratch-file lifecycle management.
-Python 3.10+, standard library only. Version 0.1.2 fixes native hook registration and SessionEnd timeout compatibility; it is
-not a claim of long-term production stability.
+Python 3.10+, standard library only. Version 0.1.3 fixes pending tool leases hiding the current session from previews,
+while retaining execution guards. Long-term reliability is not established.
 
-Source candidate 0.1.3 fixes a preview command's own pending lease hiding the
-selected session's candidates and reports execution blockers. The Git install
-commands below still reference published 0.1.2. Publication, installation and
-native acceptance of 0.1.3 remain outstanding.
+The release adds execution blockers and pending-session diagnostics. All 82
+isolated tests pass. Native acceptance of the new version requires a fresh
+session after upgrading and restarting; see the validation record.
 
 ## Install
 
 ```sh
-codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.2
+codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.3
 codex plugin add codex-disk-cleanup@codex-disk-cleanup-marketplace
 ```
 

@@ -1,8 +1,8 @@
 # Validation
 
-Version: 0.1.2. Research/development dates: 2026-10-10–11.
+Version: 0.1.3. Research/development dates: 2026-10-10–12.
 
-## v0.1.3 candidate — 2026-10-12
+## v0.1.3 release validation — 2026-10-12
 
 Native v0.1.2 acceptance in session
 `01a12dcb-b27c-73e1-af03-877c2866a8a0` proved actual creation tracking via the
@@ -12,7 +12,7 @@ empty items and zero bytes. Its tool call held a live pending lease, which
 caused plan() to skip the whole session. No apply, purge or policy change was
 performed during that acceptance.
 
-Candidate 0.1.3 separates preview visibility from execution eligibility:
+Version 0.1.3 separates preview visibility from execution eligibility:
 
 - Manual previews and preview-mode lifecycle plans can display busy snapshots
   with a `blocked` reason; automatic quarantine and move() keep pending guards.
@@ -28,8 +28,10 @@ Candidate 0.1.3 separates preview visibility from execution eligibility:
   temporary data and files, never actual user scratch or caches.
 
 These are unit/subprocess fixture results, not new native dispatch acceptance.
-The active desktop remains on 0.1.2. Candidate 0.1.3 has not yet been published,
-installed, tested in the CI matrix, or accepted for native Stop/SessionEnd.
+At release preparation, the active desktop still uses 0.1.2. Native acceptance
+of 0.1.3, including Stop/SessionEnd, remains pending a fresh session after
+upgrade/restart. CI results must be checked for the release commit, not inferred
+from the older release or local test suite.
 Its pending guard intentionally remains strict: an apply command invoked as a
 native tool can block itself; it must not bypass a lease to perform a move.
 

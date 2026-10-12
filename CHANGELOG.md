@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.3 — Unreleased (2026-10-12)
+## 0.1.3 — 2026-10-12
 
 - Fix manual previews omitting a tracked file when the preview command itself
   has a native PreToolUse pending lease. Candidate snapshots retain path,
