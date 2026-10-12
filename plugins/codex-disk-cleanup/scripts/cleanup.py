@@ -379,7 +379,9 @@ class Store:
                     if visited > limit:
                         raise Refused("scratch snapshot exceeds 2000 entries; use a smaller dedicated directory")
                     p = Path(entry.path)
-                    existing = entry.stat(follow_symlinks=False)
+                    # DirEntry.stat() returns zero identity fields on Windows.
+                    # Fresh lstat gives the file index/device used by fingerprints.
+                    existing = p.lstat()
                     if stat.S_ISLNK(existing.st_mode) or getattr(existing, "st_file_attributes", 0) & 0x400:
                         continue
                     safe_components(p)

@@ -249,6 +249,31 @@ class ProjectScratchTests(unittest.TestCase):
         self.assertEqual(self.store.status()['tracked'], [])
         self.assertEqual(moved.read_bytes(), b'original')
 
+    def test_zero_direntry_ids_do_not_allow_old_file_adoption(self):
+        self.enroll()
+        old = self.root / 'important.sqlite3'
+        old.write_bytes(b'original database')
+        real_scandir = os.scandir
+        class ZeroEntry:
+            def __init__(self, entry):
+                self.path, self.name = entry.path, entry.name
+                self.entry = entry
+            def stat(self, **kwargs):
+                values = list(self.entry.stat(**kwargs))
+                values[1:4] = [0, 0, 0]  # Windows DirEntry identity fields
+                return os.stat_result(values)
+        @contextlib.contextmanager
+        def cached_windows_entries(directory):
+            with real_scandir(directory) as entries:
+                yield iter(ZeroEntry(entry) for entry in entries)
+        with patch.object(c.os, 'scandir', cached_windows_entries):
+            self.store.hook(self.payload('PreToolUse'))
+            new = self.root / 'test_new.txt'
+            old.rename(new)
+            self.store.hook(self.payload('PostToolUse'))
+        self.assertEqual(self.store.status()['tracked'], [])
+        self.assertEqual(new.read_bytes(), b'original database')
+
     def test_unregistered_project_directory_not_tracked(self):
         path = self.create()
         self.assertTrue(path.exists())
@@ -406,6 +431,7 @@ class ProjectScratchTests(unittest.TestCase):
     def test_old_pending_list_format_is_still_supported(self):
         path = self.builtin / 'test_old.py'
         payload = self.payload('PreToolUse', cmd=f'touch {path}')
+        payload['tool_input'] = {'path': str(path)}
         self.store.hook(payload)
         self.store.db.execute('UPDATE pending SET paths=?', (json.dumps([str(path)]),))
         path.write_text('new')

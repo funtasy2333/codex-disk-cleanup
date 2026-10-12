@@ -10,7 +10,7 @@ Python-loop outputs whose individual paths were not literal tool arguments.
 Version 0.1.4 addresses both gaps with clearer location planning, explicit
 project scratch enrollment, and bounded pre/post directory snapshots.
 
-132 local isolated tests pass on macOS / Python 3.11.4, including 50 new cases
+133 local isolated tests pass on macOS / Python 3.11.4, including 51 new cases
 for dynamic paths, actual Python-loop and CLI Hook subprocesses, enrollment and
 withdrawal, existing files, session binding, retention, pending tools, root
 identity, snapshot limits, protected paths, restore/purge and legacy pending
@@ -27,6 +27,10 @@ reading their contents. Any incomplete or ambiguous Pre phase suspends all new a
 literal destinations; invalidating overlapping modern calls also clears their
 absence evidence. Legacy pending lists remain readable.
 
+The first 0.1.4 CI run passed Linux/macOS but exposed Windows DirEntry stat
+identity placeholders and an unquoted legacy fixture path. Runtime snapshots
+now use fresh lstat; a simulated zero-identity regression fails before the fix
+and passes afterward. The old-list fixture uses structured path input.
 Cross-platform CI must be verified for the release commit. Native dynamic
 snapshot dispatch/performance and full lifecycle acceptance remain outstanding.
 User policy and trust records are preserved during installation.
