@@ -3,19 +3,18 @@
 [中文](../README.md)
 
 A local Codex plugin for evidence-based scratch-file lifecycle management.
-Python 3.10+, standard library only. Published version: **0.1.4**. This branch
-contains an unreleased, uninstalled **0.1.5 source candidate** that discovers new
+Python 3.10+, standard library only. Release version: **0.1.5**, which that discovers new
 dedicated session temporary directories; scratch becomes optional. Preview is the
 default. Explicit quarantine mode moves files into reversible quarantine;
 permanent deletion is separate.
 
-All 182 isolated candidate tests pass. Cross-platform CI and upgraded native
-Hook acceptance remain outstanding; see the validation record.
+All 182 isolated local tests pass. Cross-platform CI is checked before release;
+native Hook acceptance after upgrade/restart is recorded separately.
 
 ## Install
 
 ```sh
-codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.4
+codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.5
 codex plugin add codex-disk-cleanup@codex-disk-cleanup-marketplace
 ```
 
@@ -93,10 +92,10 @@ sessions. For unusually long-running jobs, keep preview mode enabled.
 Dynamic shell/code paths and outputs are not evaluated. Deliverables and
 permanent tests belong in the project, not scratch.
 
-## 0.1.5 source candidate: observe actual temporary locations
+## 0.1.5: observe actual temporary locations
 
-Published/installed 0.1.4 remains unchanged. This candidate has not been released,
-installed or accepted through native desktop dispatch. Scratch is optional:
+The 0.1.5 upgrade requires restart and separate native dispatch acceptance.
+Scratch is optional:
 literal tool-input paths can identify new dedicated OS temporary directories.
 Pre pins an absent candidate and existing parent/base identities; matching Post
 checks session, call, turn and the safe new directory identity. Only stdlib OS

@@ -4,9 +4,9 @@
 
 为本地 Codex 构建的临时文件生命周期插件。Python 3.10+，运行时只用标准库。
 
-当前发布版本为 **0.1.4**；本分支提供尚未发布、安装的 **0.1.5 源码候选**，支持自动发现会话新建的专用系统临时目录，scratch 为可选位置。默认只预览；显式启用隔离模式后，文件移入可恢复的隔离区。永久删除是独立操作。
+发布版本为 **0.1.5**，支持自动发现会话新建的专用系统临时目录，scratch 为可选位置。默认只预览；显式启用隔离模式后，文件移入可恢复的隔离区。永久删除是独立操作。
 
-候选版 182 项隔离测试通过；跨平台 CI 和升级后的原生 Hooks 验收仍待完成。GitHub 公开发布不等于已上架 OpenAI 公共插件目录。
+182 项本地隔离测试通过；发布前核对跨平台 CI，升级后的原生 Hooks 验收另行记录。GitHub 公开发布不等于已上架 OpenAI 公共插件目录。
 
 [English](docs/README.en.md) · [安全边界](SECURITY.md) · [设计](docs/design.md) · [验收记录](docs/validation.md)
 
@@ -32,7 +32,7 @@
 在支持插件命令的 Codex CLI 中：
 
 ```sh
-codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.4
+codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.5
 codex plugin add codex-disk-cleanup@codex-disk-cleanup-marketplace
 ```
 
@@ -77,9 +77,9 @@ python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" audit
 
 Windows 将上面的 `python3` 换为 `py -3`，并使用 PowerShell 对应的路径变量语法。
 
-## 0.1.5 候选：直接观察临时文件位置
+## 0.1.5：直接观察临时文件位置
 
-当前发布和安装版本为 0.1.4；以下是尚未发布、安装及原生验收的 0.1.5 源码候选。会话无需改用 scratch：插件从工具输入的字面路径自动发现本次会话新出现的专用系统临时目录，后续匹配工具调用继续观察该目录的新文件。scratch 保留为可选受管位置。
+0.1.5 新增以下行为，安装后需重启再验证原生会话。会话无需改用 scratch：插件从工具输入的字面路径自动发现本次会话新出现的专用系统临时目录，后续匹配工具调用继续观察该目录的新文件。scratch 保留为可选受管位置。
 
 - 只检查工具明确引用的路径；允许 stdlib 系统临时位置和 POSIX `/tmp` 的系统别名，不扫描整个临时区。相对路径结合绝对 cwd 解释；不执行任意代码，不从工具输出推定创建权。随机生成且未在输入中出现的目录无法自动归属。
 - Pre 记录此前不存在的目录候选与现存父目录/base 身份，Post 校验实际目录、会话、工具调用、回合和设备号/inode。已存在或共享目录不会自动收编；链接、Git、敏感路径、Codex 数据和重叠受管目录继续保护。

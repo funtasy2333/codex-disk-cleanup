@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.5 — Unreleased (2026-10-12)
+## 0.1.5 — 2026-10-13
 
 - Make scratch optional; observe literal referenced new dedicated system-temp
   directories through matching session/call/turn and parent/base/root identity.
@@ -17,7 +17,7 @@
   exclude custom Codex home from observations, refresh discovery revocation at
   execution, and retain blocking pending leases for oversized tool inputs.
 - Add 49 isolated regressions; 182 local tests pass. Native host lifecycle and
-  cross-platform CI acceptance remain outstanding; candidate is not installed.
+  cross-platform CI is checked before release; native acceptance remains separate.
 
 ## 0.1.4 — 2026-10-12
 

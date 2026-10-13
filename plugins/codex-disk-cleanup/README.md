@@ -86,7 +86,7 @@ this exact session source directory and SHA-256 matching project copies. This
 read-only command creates no state, tracking or executable plan; copies do not
 prove originals are unused by conversation viewing or editing.
 
-## Automatic temp discovery — 0.1.5 source candidate
+## Automatic temp discovery — 0.1.5
 
 Scratch is optional. Matched Hooks can discover explicitly referenced new OS
 temporary subdirectories and bind parent/base/root identity to a session. Initial

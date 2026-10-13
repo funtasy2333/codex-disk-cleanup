@@ -81,7 +81,7 @@ so a rename cannot silently become an unbounded cross-volume copy.
 The implementation is a trusted-user maintenance tool. It deliberately does not
 claim a hostile-process filesystem sandbox. See SECURITY.md for races and leases.
 
-## Automatic temporary observation (0.1.5 candidate)
+## Automatic temporary observation (0.1.5)
 
 Literal extraction is performed once per Hook. Pre discovers only the first
 missing path component under a canonical OS temp base, with a stable existing

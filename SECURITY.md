@@ -68,7 +68,7 @@ For suspected data loss or security defects, disable automatic mode (`init
 reporting if available. Do not publish authentication files or private local
 paths in public issues. Ordinary non-sensitive bugs can be reported in issues.
 
-## Observed system-temporary roots (0.1.5 candidate)
+## Observed system-temporary roots (0.1.5)
 
 The user's requested discovery policy authorizes future observed dedicated
 OS-temp subdirectories, not a whole-temp maintenance scan. Missing-path evidence

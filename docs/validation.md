@@ -190,3 +190,12 @@ need user-environment acceptance.
 Payload fixtures are not proof of dispatch by every host version. No support is
 claimed for cloud-orchestrated Work, network filesystems or hostile concurrent
 filesystem mutation. Release 0.1.2 starts in preview mode.
+
+## v0.1.5 release preparation — 2026-10-13
+
+The user authorized publication and installation. Release preparation changes
+metadata/documentation only, preserving reviewed runtime commit 46efdc9. The
+182-case suite and package checks are rerun, with six-platform CI checked for the
+release commit. Installation uses supported config/value/write and marketplace
+upgrade/plugin add, preserves quarantine policy, and retains byte-identical old
+release files for still-active chats. Native lifecycle acceptance requires restart.
