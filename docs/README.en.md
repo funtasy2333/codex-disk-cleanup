@@ -92,6 +92,43 @@ sessions. For unusually long-running jobs, keep preview mode enabled.
 Dynamic shell/code paths and outputs are not evaluated. Deliverables and
 permanent tests belong in the project, not scratch.
 
+
+## 0.1.6 source candidate: review to quarantine and restore
+
+Published and installed version remains 0.1.5. These commands are part of an
+unreleased, uninstalled 0.1.6 source candidate; native acceptance is pending.
+Development never processes real candidate files.
+
+1. `review-list --session SESSION_ID` is read-only: exact paths, sizes, observation
+   sources, manual purposes/choices, current metadata/parent identities and snapshot
+   tokens. Unknown use remains unknown. Redisplay and review changed files.
+2. `review-mark --session SESSION_ID --candidate ID --snapshot SNAPSHOT
+   --decision keep|quarantine --purpose TEXT` records one explicit choice and
+   nonempty manual purpose without moving files. Keep vetoes automatic moves
+   of that path, including previously generated plans.
+3. `review-plan --session SESSION_ID [--candidate ID ...]` displays the exact
+   marked quarantine list, purposes, total bytes, blockers, a single-use 15-minute
+   plan ID and SHA256 digest. Explicit candidate arguments choose a subset.
+4. `review-apply PLAN_ID --digest DIGEST --yes` confirms exactly that list and
+   rechecks current decision/observation, parent identity, file metadata/content
+   fingerprint, keep veto and pending access. Changed/revoked files are skipped.
+   Ordinary quick/deep apply cannot bypass review digest confirmation.
+5. `restore QUARANTINE_ID` restores without overwrite and marks the path keep.
+   Per-move archived approvals survive review-queue eviction and preserve restore
+   authority. `purge ID --yes` remains separately authorized permanent deletion.
+
+Manual exact-list confirmation allows immediate quarantine without changing
+seven-day automatic retention, discovery settings, auto mode or root enrollment.
+Only named files in mixed project directories are authorized; no neighbor scan.
+Quarantine resides in the source's immediate parent `.codex-disk-cleanup-quarantine/`.
+Quarantine does not reclaim space until explicit purge.
+
+Pending owner-session calls, foreign explicit parent access, canonical temp aliases,
+legacy records and missing/invalid cwd access remain execution guards. Plans show
+blocked items; a native apply tool can block itself, requiring completion and a
+separate terminal within the authorized scope. Never delete leases to bypass guards.
+No automatic use inference, candidate adoption or bulk approval occurs.
+
 ## 0.1.5: observe actual temporary locations
 
 The 0.1.5 upgrade requires restart and separate native dispatch acceptance.

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.6 — Unreleased (2026-10-14)
+
+- Add read-only candidate/use display, explicit keep/quarantine marking, exact
+  subset plans and digest-plus-yes confirmation before reversible manual moves.
+- Bind displayed snapshots, manual purposes, file content fingerprints and parent
+  identities to revocable decisions; keep vetoes automatic moves for that path.
+- Recheck owner/foreign pending access, canonical temp aliases and unknown legacy
+  or missing-cwd access. Never automatically approve or adopt review candidates.
+- Archive exact per-move authority for restore/purge/recover independently of
+  queue eviction. Restore rebuilds keep protection without overwriting files.
+- Add 48 isolated workflow regressions; all 230 local tests pass. Source candidate
+  only: no real candidate processing, publication, install or native acceptance.
+
 ## 0.1.5 — 2026-10-13
 
 - Make scratch optional; observe literal referenced new dedicated system-temp

@@ -17,7 +17,7 @@ import tempfile
 import time
 import uuid
 
-VERSION = "0.1.5"
+VERSION = "0.1.6"
 RETENTION = {"test": 0, "temp": 7 * 86400, "cron-output": 14 * 86400}
 PROTECTED = {".git", ".codex", ".agents", "sessions", "archived_sessions", "memories",
              "skills", "plugins", "outputs", "deliverables", "node_modules", ".ssh",
@@ -242,6 +242,11 @@ class Store:
         CREATE TABLE IF NOT EXISTS discovered_temp (path TEXT PRIMARY KEY, session TEXT, policy TEXT);
         CREATE TABLE IF NOT EXISTS review_candidates (path TEXT, session TEXT, at REAL, detail TEXT,
             PRIMARY KEY(path,session));
+        CREATE TABLE IF NOT EXISTS review_decisions (id TEXT PRIMARY KEY, path TEXT, session TEXT,
+            decision TEXT, detail TEXT);
+        CREATE TABLE IF NOT EXISTS review_moves (id TEXT PRIMARY KEY, approval TEXT);
+        CREATE INDEX IF NOT EXISTS review_decisions_path ON review_decisions(path,decision);
+        CREATE INDEX IF NOT EXISTS review_decisions_session ON review_decisions(session,decision);
         """)
         row = self.db.execute("SELECT value FROM metadata WHERE key='schema'").fetchone()
         if row and row[0] != "1":
@@ -623,6 +628,200 @@ class Store:
         except (ValueError, OSError):
             pass
 
+    @staticmethod
+    def review_id(path, session):
+        return hashlib.sha256((session + '\0' + path).encode()).hexdigest()[:32]
+
+    @staticmethod
+    def review_digest(items):
+        return hashlib.sha256(compact(items).encode()).hexdigest()
+
+    def review_file(self, path):
+        path = Path(path)
+        if not path.is_absolute():
+            raise Refused('review path must be absolute')
+        path = self.candidate(path, Path(path.anchor))
+        if self.private_observation_path(path):
+            raise Refused('Codex home and plugin state are protected')
+        identity = path.lstat()
+        if not stat.S_ISREG(identity.st_mode) or identity.st_nlink != 1 or identity.st_size > MAX_BYTES:
+            raise Refused('review requires a single-link regular file of at most 64 MiB')
+        parent = path.parent.lstat()
+        return ({'dev': identity.st_dev, 'ino': identity.st_ino, 'size': identity.st_size,
+                 'mtime': identity.st_mtime_ns, 'ctime': identity.st_ctime_ns, 'mode': identity.st_mode},
+                {'path': str(path.parent), 'dev': parent.st_dev, 'ino': parent.st_ino})
+
+    def review_record(self, cid, session):
+        if (not isinstance(session, str) or not session or len(session) > 512
+                or not isinstance(cid, str) or not re.fullmatch(r'[a-f0-9]{32}', cid)):
+            raise Refused('valid candidate and session required')
+        if self.has_table('review_candidates'):
+            for row in self.db.execute('SELECT * FROM review_candidates WHERE session=? LIMIT ?',
+                                       (session, MAX_ITEMS)):
+                if self.review_id(row['path'], session) == cid:
+                    return row
+        raise Refused('candidate not found in the specified session')
+
+    def review_view(self, row):
+        detail = json.loads(row['detail'])
+        if detail.get('path') != row['path'] or detail.get('session') != row['session']:
+            raise Refused('review observation record mismatch')
+        cid = self.review_id(row['path'], row['session'])
+        result = {'candidate_id': cid, 'session': row['session'], 'path': row['path'],
+                  'reason': detail.get('reason'), 'observed_at': row['at'],
+                  'bytes': detail['fp']['size'], 'purpose': None, 'decision': 'unreviewed',
+                  'snapshot': None, 'state': 'blocked', 'current_fp': None, 'current_parent': None}
+        if self.has_table('review_decisions'):
+            decision = self.db.execute('SELECT * FROM review_decisions WHERE id=?', (cid,)).fetchone()
+            if decision:
+                result.update(decision=decision['decision'], purpose=json.loads(decision['detail'])['purpose'])
+        try:
+            fp, parent = self.review_file(row['path'])
+            result.update(bytes=fp['size'], current_fp=fp, current_parent=parent,
+                          state='available' if fp == detail['fp'] else 'changed',
+                          snapshot=self.review_digest({'path': row['path'], 'session': row['session'],
+                                     'observation': row['detail'], 'fp': fp, 'parent': parent}))
+        except (ValueError, OSError) as e:
+            result['blocked_reason'] = str(e)
+        return result
+
+    def review_list(self, session=None):
+        result = {'items': [], 'bytes': 0, 'preview_only': True,
+                  'note': 'Purpose is manually supplied; observation is not disposal authorization. '
+                          'Refresh the display before marking a changed file.'}
+        if self.has_table('review_candidates'):
+            sql = 'SELECT * FROM review_candidates'
+            params = []
+            if session is not None:
+                sql += ' WHERE session=?'
+                params.append(session)
+            params.append(MAX_ITEMS)
+            for row in self.db.execute(sql + ' ORDER BY at DESC,path LIMIT ?', params):
+                result['items'].append(self.review_view(row))
+        result['bytes'] = sum(item['bytes'] for item in result['items'])
+        return result
+
+    def review_mark(self, cid, session, decision, purpose, snapshot):
+        if decision not in ('keep', 'quarantine'):
+            raise Refused('review decision must be keep or quarantine')
+        if not isinstance(purpose, str) or not purpose.strip() or len(purpose) > 2048:
+            raise Refused('a nonempty purpose of at most 2048 characters is required')
+        with self.transaction():
+            row = self.review_record(cid, session)
+            view = self.review_view(row)
+            if not snapshot or snapshot != view['snapshot']:
+                raise Refused('file or observation changed; display and review it again')
+            fp, parent = self.review_file(row['path'])
+            if snapshot != self.review_digest({'path': row['path'], 'session': row['session'],
+                                               'observation': row['detail'], 'fp': fp, 'parent': parent}):
+                raise Refused('file changed since display')
+            if decision == 'quarantine':
+                hashed = fingerprint(Path(row['path']))
+                if any(hashed[k] != v for k, v in fp.items()):
+                    raise Refused('file changed during review')
+                fp = hashed
+            item = {'kind': 'review', 'candidate_id': cid, 'path': row['path'], 'session': session,
+                    'purpose': purpose.strip(), 'token': uuid.uuid4().hex, 'parent': parent,
+                    'observation': row['detail'], 'fp': fp}
+            self.db.execute('INSERT OR REPLACE INTO review_decisions VALUES (?,?,?,?,?)',
+                            (cid, row['path'], session, decision, compact(item)))
+            self.audit('review-mark', {'candidate': cid, 'session': session, 'decision': decision,
+                                       'path': row['path'], 'purpose': purpose.strip()})
+        return {'candidate_id': cid, 'decision': decision, 'purpose': purpose.strip(),
+                'note': 'No files moved. Quarantine requires an exact confirmed review plan.'}
+
+    def validate_review_parent(self, item):
+        root, path = Path(item['parent']['path']), Path(item['path'])
+        if not root.is_absolute() or path.parent != root:
+            raise Refused('review parent mismatch')
+        self.candidate(path, Path(path.anchor))
+        if self.private_observation_path(path):
+            raise Refused('Codex home and plugin state are protected')
+        safe_components(root)
+        current = root.lstat()
+        if not stat.S_ISDIR(current.st_mode) or (current.st_dev, current.st_ino) != (
+                item['parent']['dev'], item['parent']['ino']):
+            raise Refused('review parent identity changed')
+        return root
+
+    def review_authorized(self, item):
+        row = self.db.execute('SELECT * FROM review_decisions WHERE id=?', (item['candidate_id'],)).fetchone()
+        if (not row or row['decision'] != 'quarantine' or row['path'] != item['path']
+                or row['session'] != item['session'] or json.loads(row['detail']) != item):
+            raise Refused('review decision changed or revoked')
+        observation = self.review_record(item['candidate_id'], item['session'])
+        if observation['detail'] != item['observation']:
+            raise Refused('review observation changed or removed')
+        return self.validate_review_parent(item)
+
+    def review_busy(self, item):
+        root = Path(item['parent']['path'])
+        for row in self.db.execute('SELECT session,paths FROM pending WHERE created>?',
+                                   (time.time() - LEASE,)):
+            evidence = json.loads(row['paths'])
+            if row['session'] == item['session']:
+                return 'session has a pending tool'
+            if (not isinstance(evidence, dict) or evidence.get('incomplete_access')
+                    or not isinstance(evidence.get('access_paths'), list)):
+                return 'pending tool full access coverage is unknown'
+            if any(Path(p) == root or Path(p).is_relative_to(root) or root.is_relative_to(Path(p))
+                   for p in evidence['access_paths']):
+                return 'review parent has a pending tool access'
+        return None
+
+    def review_plan(self, session, candidates=None):
+        if not isinstance(session, str) or not session or len(session) > 512:
+            raise Refused('valid review session required')
+        if candidates is not None and (not candidates or len(candidates) > MAX_ITEMS
+                                       or len(set(candidates)) != len(candidates)):
+            raise Refused('select distinct candidates within the review limit')
+        items, skipped, blocked = [], [], []
+        with self.transaction():
+            rows = self.db.execute("SELECT * FROM review_decisions WHERE session=? AND decision='quarantine' "
+                                   'ORDER BY path LIMIT ?', (session, MAX_ITEMS)).fetchall()
+            if candidates is not None:
+                selected = set(candidates)
+                if not selected.issubset({r['id'] for r in rows}):
+                    raise Refused('selection includes an unknown or non-quarantine candidate')
+                rows = [r for r in rows if r['id'] in selected]
+            for row in rows:
+                item = json.loads(row['detail'])
+                try:
+                    self.review_authorized(item)
+                    if fingerprint(Path(item['path'])) != item['fp']:
+                        raise Refused('file changed since review; display and mark again')
+                    items.append(item)
+                    obstruction = self.review_busy(item)
+                    if obstruction:
+                        blocked.append({'path': item['path'], 'reason': obstruction})
+                except (ValueError, OSError) as e:
+                    skipped.append({'path': item['path'], 'reason': str(e)})
+            pid = uuid.uuid4().hex
+            self.db.execute('DELETE FROM plans WHERE created<?', (time.time() - PLAN_TTL,))
+            self.db.execute('INSERT INTO plans VALUES (?,?,?,0)', (pid, time.time(), compact(items)))
+            self.audit('review-plan', {'id': pid, 'count': len(items), 'digest': self.review_digest(items)})
+        return {'plan_id': pid, 'digest': self.review_digest(items), 'scope': 'review',
+                'expires_in_seconds': PLAN_TTL, 'items': items, 'blocked': blocked, 'skipped': skipped,
+                'bytes': sum(x['fp']['size'] for x in items),
+                'note': 'Confirm exactly these files with review-apply PLAN --digest DIGEST --yes. '
+                        'Manual confirmation authorizes immediate quarantine, not future automatic cleanup.'}
+
+    def review_move_state(self, mid, state):
+        if not self.has_table('review_moves'):
+            return
+        row = self.db.execute('SELECT approval FROM review_moves WHERE id=?', (mid,)).fetchone()
+        if row:
+            item = json.loads(row[0])
+            if state == 'restored':
+                # Explicit restore retains this exact path even after queue or
+                # decision eviction; never overwrite the archived move approval.
+                item['token'] = uuid.uuid4().hex
+                self.db.execute('INSERT OR REPLACE INTO review_decisions VALUES (?,?,?,?,?)',
+                                (item['candidate_id'], item['path'], item['session'], 'keep', compact(item)))
+            else:
+                self.db.execute('UPDATE review_decisions SET decision=? WHERE id=? AND detail=?',
+                                (state, item['candidate_id'], compact(item)))
+
     def discovery_post(self, evidence, payload, budget):
         if not self.discovery_enabled():
             return
@@ -731,6 +930,8 @@ class Store:
         return p
 
     def root_for(self, item):
+        if item['kind'] == 'review':
+            return self.review_authorized(item)
         if item["kind"] == "tracked":
             if item.get('temp_policy') is not None:
                 spec = item['temp_policy']
@@ -875,6 +1076,9 @@ class Store:
                                                                  'temp_candidates': temp_candidates,
                                                                  'outside_absent': outside_absent,
                                                                  'temp_access': temp_access,
+                                                                 'access_paths': sorted(set([str(p) for p in literals] + temp_access +
+                                                                     [os.path.abspath(payload['cwd'])]))
+                                                                     if isinstance(payload.get('cwd'), str) and Path(payload['cwd']).is_absolute() else None,
                                                                  'incomplete_access': incomplete_access,
                                                                  "literal_identities": literal_identities})))
                     return {"observed": len(absent)}
@@ -1072,14 +1276,17 @@ class Store:
                     except (OSError, ValueError) as e:
                         skipped.append({"path": str(p), "reason": str(e)})
 
-    def apply(self, pid):
+    def apply(self, pid, *, review_digest=None):
         results, skipped = [], []
         with self.transaction():
             row = self.db.execute("SELECT * FROM plans WHERE id=?", (pid,)).fetchone()
             if not row or row["used"] or time.time() - row["created"] > PLAN_TTL:
                 raise Refused("unknown, used or expired plan")
-            self.db.execute("UPDATE plans SET used=1 WHERE id=?", (pid,))
             items = json.loads(row["items"])
+            if any(item.get('kind') == 'review' for item in items) or review_digest is not None:
+                if review_digest != self.review_digest(items):
+                    raise Refused('exact review plan digest confirmation required')
+            self.db.execute("UPDATE plans SET used=1 WHERE id=?", (pid,))
         for item in items:
             try:
                 mid = self.move(item)
@@ -1095,6 +1302,13 @@ class Store:
                 raise Refused('pending tool access coverage is incomplete')
             root = self.root_for(item)
             p = self.candidate(Path(item["path"]), root)
+            if self.has_table('review_decisions') and self.db.execute(
+                    "SELECT 1 FROM review_decisions WHERE path=? AND decision='keep' LIMIT 1", (str(p),)).fetchone():
+                raise Refused('file is marked keep')
+            if item['kind'] == 'review':
+                obstruction = self.review_busy(item)
+                if obstruction:
+                    raise Refused(obstruction)
             if item["kind"] == "tracked":
                 row = self.db.execute("SELECT * FROM tracked WHERE path=?", (str(p),)).fetchone()
                 if not row or row["session"] != item["session"] or json.loads(row["fp"]) != item["fp"]:
@@ -1120,6 +1334,8 @@ class Store:
             # Durable intent before filesystem change: recover can reconcile a crash.
             self.db.execute("INSERT INTO moves VALUES (?,?,?,?,?,'moving',?)",
                             (mid, str(p), str(dest), str(root), compact(item["fp"]), time.time()))
+            if item['kind'] == 'review':
+                self.db.execute('INSERT INTO review_moves VALUES (?,?)', (mid, compact(item)))
         safe_components(p)
         if fingerprint(p) != item["fp"]:
             raise Refused("file changed before move")
@@ -1130,12 +1346,21 @@ class Store:
         with self.transaction():
             self.db.execute("UPDATE moves SET state='quarantined' WHERE id=?", (mid,))
             self.db.execute("DELETE FROM tracked WHERE path=?", (str(p),))
+            self.review_move_state(mid, 'quarantined')
             self.audit("quarantine", {"id": mid, "path": str(p)})
         return mid
 
     def quarantine_path(self, row):
         root = Path(row["root"])
+        review = (self.db.execute('SELECT approval FROM review_moves WHERE id=?', (row['id'],)).fetchone()
+                  if self.has_table('review_moves') else None)
+        if review:
+            item = json.loads(review[0])
+            pinned = self.validate_review_parent(item)
+            if pinned != root or item['path'] != row['source'] or item['fp'] != json.loads(row['fp']):
+                raise Refused('review move approval mismatch')
         authorized = root.is_relative_to(self.scratch) and root.parent == self.scratch
+        authorized = authorized or bool(review)
         authorized = authorized or any(root == Path(r["path"]) for r in self.roots)
         for spec in self.project_roots:
             if root == Path(spec["path"]):
@@ -1174,6 +1399,7 @@ class Store:
             src.unlink()
         with self.transaction():
             self.db.execute("UPDATE moves SET state='restored' WHERE id=?", (mid,))
+            self.review_move_state(mid, 'restored')
             self.audit("restore", {"id": mid})
         return {"restored": str(dest)}
 
@@ -1189,6 +1415,7 @@ class Store:
         p.unlink()
         with self.transaction():
             self.db.execute("UPDATE moves SET state='purged' WHERE id=?", (mid,))
+            self.review_move_state(mid, 'purged')
             self.audit("purge", {"id": mid, "bytes": json.loads(row["fp"])["size"]})
         return {"purged": mid}
 
@@ -1223,6 +1450,7 @@ class Store:
                 # Ambiguous records remain retryable and are never auto-deleted.
                 if state != "needs-review":
                     self.db.execute("UPDATE moves SET state=? WHERE id=?", (state, row["id"]))
+                    self.review_move_state(row['id'], state)
                 results.append({"id": row["id"], "state": state})
             self.audit("recover", results)
         return {"recovered": results}
@@ -1296,6 +1524,21 @@ def parser():
     init.add_argument("--auto", choices=("preview", "quarantine"))
     init.add_argument('--discover-temp', choices=('on', 'off'))
     subs.add_parser("status")
+    review = subs.add_parser('review-list', help='Show candidates, unknown/manual purpose and current identity; read-only')
+    review.add_argument('--session')
+    mark = subs.add_parser('review-mark', help='Mark one freshly displayed candidate; never moves files')
+    mark.add_argument('--session', required=True)
+    mark.add_argument('--candidate', required=True)
+    mark.add_argument('--snapshot', required=True)
+    mark.add_argument('--decision', required=True, choices=('keep', 'quarantine'))
+    mark.add_argument('--purpose', required=True)
+    review_plan = subs.add_parser('review-plan', help='Preview the exact marked quarantine list')
+    review_plan.add_argument('--session', required=True)
+    review_plan.add_argument('--candidate', action='append')
+    review_apply = subs.add_parser('review-apply', help='Quarantine an exact confirmed review plan')
+    review_apply.add_argument('id')
+    review_apply.add_argument('--digest', required=True)
+    review_apply.add_argument('--yes', action='store_true')
     generated = subs.add_parser("generated-preview", help="Read-only generated-image copy comparison; never applies")
     generated.add_argument("--session", required=True)
     generated.add_argument("--copy-root", type=Path, action="append", default=[])
@@ -1343,7 +1586,7 @@ def main(argv=None):
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0
         data, data_source = resolve_data(args.data)
-        store = Store(data, read_only=args.command == "status")
+        store = Store(data, read_only=args.command in ('status', 'review-list'))
         if is_hook:
             raw = sys.stdin.buffer.read(1024 * 1024 + 1)
             if len(raw) > 1024 * 1024:
@@ -1399,6 +1642,17 @@ def main(argv=None):
         elif args.command == "status":
             result = store.status()
             result["data_source"] = data_source
+        elif args.command == 'review-list':
+            result = store.review_list(args.session)
+            result['data_source'] = data_source
+        elif args.command == 'review-mark':
+            result = store.review_mark(args.candidate, args.session, args.decision, args.purpose, args.snapshot)
+        elif args.command == 'review-plan':
+            result = store.review_plan(args.session, args.candidate)
+        elif args.command == 'review-apply':
+            if not args.yes:
+                raise Refused('review-apply requires --yes after confirming the exact list and digest')
+            result = store.apply(args.id, review_digest=args.digest)
         elif args.command in ("dry-run", "quick", "deep"):
             if getattr(args, "apply", None):
                 if not args.yes:

@@ -112,3 +112,28 @@ rechecks the on-disk discovery switch; another process can revoke old plans.
 Review-only observations exclude Codex home (including a custom CODEX_HOME) and
 plugin state. Oversized literal inputs are not silently truncated: an unknown
 access lease blocks every move and invalidates concurrent creation evidence.
+
+## Explicit review workflow (0.1.6 source candidate)
+
+Review is a separate authority, never automatic file ownership. A read-only display
+captures current file/parent metadata and an observation-bound snapshot token;
+unexplained use stays unknown. Marking requires that exact token and a manual
+purpose. Quarantine marking hashes only the selected file and binds its complete
+fingerprint to a decision token. Keep vetoes every automatic move for that path.
+Exact-list plans contain these immutable items; apply requires their SHA256 digest
+and explicit yes. Items are not added to automatic lifecycle plans, and immediate
+manual quarantine does not change automatic retention or enrollment.
+
+Execute rechecks the live observation, decision token, file fingerprint and pinned
+immediate-parent identity. Pending evidence includes bounded literals and cwd,
+with canonical OS temp references; legacy or missing cwd access is unknown and
+blocks review moves. Only exact named files in mixed directories gain authority.
+Existing protected/Git/link/hardlink/Codex-home restrictions remain.
+
+Optional schema1 review_decisions and review_moves tables retain decisions and
+per-move archived authority. Restore/purge/recover validate that archive and root
+identity independently of queue eviction and discovery configuration. Restore
+never overwrites; it recreates keep protection even if the decision was evicted.
+Older runtimes can read schema1 state, but cannot restore new manual review moves
+without this workflow; restore them before downgrading. The existing advisory
+Hook, trusted-local-state and filesystem race limits continue to apply.

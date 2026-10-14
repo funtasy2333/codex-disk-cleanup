@@ -199,3 +199,17 @@ metadata/documentation only, preserving reviewed runtime commit 46efdc9. The
 release commit. Installation uses supported config/value/write and marketplace
 upgrade/plugin add, preserves quarantine policy, and retains byte-identical old
 release files for still-active chats. Native lifecycle acceptance requires restart.
+
+## v0.1.6 review workflow source candidate — 2026-10-14
+
+230 local isolated tests pass: 182 existing tests plus 48 new review cases.
+The initial 37 missing-feature tests were run red before runtime implementation.
+Additional red/green regressions proved snapshot-to-hash races, foreign temp alias
+cwd, missing cwd access, metadata display and eviction-safe restore keep veto.
+Real subprocess tests cover list, mark, plan, digest-plus-yes apply and restore.
+Fixtures cover mixed-parent neighbor preservation, stale/used/subset plans,
+choice/observation revocation, current identity/content/parent changes, protected
+and linked paths, pending legacy/owner/foreign/overflow, read-only missing/old state,
+explicit purge and interrupted-move recovery. All cleanup uses isolated fixtures.
+No actual user candidate was adopted, marked or moved; installed/public version
+remains0.1.5. Cross-platform CI, native dispatch and release/install are outstanding.

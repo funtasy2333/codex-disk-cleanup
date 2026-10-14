@@ -77,6 +77,30 @@ python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" audit
 
 Windows 将上面的 `python3` 换为 `py -3`，并使用 PowerShell 对应的路径变量语法。
 
+
+## 0.1.6 源码候选：审核候选的处理流程
+
+当前发布和安装版本仍为 0.1.5；以下功能属于尚未发布、安装及原生验收的 0.1.6 候选版。本次开发不处理实际审核候选。
+
+1. **展示文件及用途**：`review-list --session SESSION_ID` 只读展示文件路径、大小、观察来源、状态和人工说明的用途。尚未说明的用途显示为空，不能把观察来源当作已证实用途。列表包含当前身份和 `snapshot`；文件变化后必须重新展示、审核。
+2. **标记保留或隔离**：`review-mark` 指定会话、候选 ID、当前 snapshot、`keep` 或 `quarantine` 及非空用途说明。此步仅记决策，不移动文件。保留标记同时阻止该路径的自动隔离。
+3. **确认清单**：`review-plan --session SESSION_ID` 列出该会话标记为隔离的文件、用途、数量、总大小、阻止原因、计划 ID 和摘要。重复 `--candidate ID` 可明确选择子集。计划十五分钟内有效、只能使用一次；确认范围必须是展示出的确切文件。
+4. **核验并隔离**：`review-apply PLAN_ID --digest DIGEST --yes` 重新核对决策、观察记录、父目录身份、文件内容指纹、保留标记及 pending 访问，变化或失效的文件跳过并说明原因。普通 `quick --apply` 无法绕过审核摘要确认。
+5. **恢复**：`restore QUARANTINE_ID` 恢复到原路径，拒绝覆盖。恢复后自动标记保留；候选列表被更新或移除也不丢失已隔离文件的恢复依据。`purge ID --yes` 仍是另行授权的永久删除。
+
+```sh
+python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" review-list --session SESSION_ID
+python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" review-mark --session SESSION_ID --candidate CANDIDATE_ID --snapshot SNAPSHOT --decision keep --purpose "需要保留的源材料"
+python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" review-mark --session SESSION_ID --candidate CANDIDATE_ID --snapshot SNAPSHOT --decision quarantine --purpose "已完成任务的一次性渲染检查"
+python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" review-plan --session SESSION_ID --candidate CANDIDATE_ID
+python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" review-apply PLAN_ID --digest DIGEST --yes
+python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" restore QUARANTINE_ID
+```
+
+明确确认的人工清单允许立即隔离这些文件，不改变自动发现目录的七天保留期限、隔离策略或登记项目目录。混合目录中只处理点名文件，邻近成果保留。隔离区位于所选文件的直接父目录 `.codex-disk-cleanup-quarantine/`，空间需永久删除后才释放。
+
+审核计划展示被 pending 阻止的项；执行仍检查同一会话、其他会话对父目录的明确访问，以及旧版或缺少工作目录时的未知访问。旧记录的未知访问在正常工具结束或租期到期前阻止人工隔离，不得删租约来绕过。原生执行命令可能因自身租约被阻止，应待工具结束后在已授权范围内通过独立终端执行。没有从候选名单自动判断一次性用途或批量批准的行为。
+
 ## 0.1.5：直接观察临时文件位置
 
 0.1.5 新增以下行为，安装后需重启再验证原生会话。会话无需改用 scratch：插件从工具输入的字面路径自动发现本次会话新出现的专用系统临时目录，后续匹配工具调用继续观察该目录的新文件。scratch 保留为可选受管位置。
