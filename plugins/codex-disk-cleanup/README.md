@@ -113,11 +113,10 @@ Review-only observations exclude Codex home (including a custom CODEX_HOME) and
 plugin state. Oversized literal inputs are not silently truncated: an unknown
 access lease blocks every move and invalidates concurrent creation evidence.
 
-## 0.1.6 source candidate: review to quarantine and restore
+## 0.1.6: review to quarantine and restore
 
-Published and installed version remains 0.1.5. These commands are part of an
-unreleased, uninstalled 0.1.6 source candidate; native acceptance is pending.
-Development never processes real candidate files.
+The 0.1.6 release adds these commands. Native acceptance requires restart after
+installation. Release and installation never process actual review candidates.
 
 1. `review-list --session SESSION_ID` is read-only: exact paths, sizes, observation
    sources, manual purposes/choices, current metadata/parent identities and snapshot

@@ -93,7 +93,7 @@ Review-only observations exclude Codex home (including a custom CODEX_HOME) and
 plugin state. Oversized literal inputs are not silently truncated: an unknown
 access lease blocks every move and invalidates concurrent creation evidence.
 
-## Explicit review workflow (0.1.6 source candidate)
+## Explicit review workflow (0.1.6)
 
 Review is a separate authority, never automatic file ownership. A read-only display
 captures current file/parent metadata and an observation-bound snapshot token;

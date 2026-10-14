@@ -3,18 +3,19 @@
 [中文](../README.md)
 
 A local Codex plugin for evidence-based scratch-file lifecycle management.
-Python 3.10+, standard library only. Release version: **0.1.5**, which that discovers new
-dedicated session temporary directories; scratch becomes optional. Preview is the
+Python 3.10+, standard library only. Release version: **0.1.6**, with automatic discovery of new dedicated session
+temporary directories and explicit review, retain, quarantine and restore.
+Scratch is optional. Preview is the
 default. Explicit quarantine mode moves files into reversible quarantine;
 permanent deletion is separate.
 
-All 182 isolated local tests pass. Cross-platform CI is checked before release;
+All 230 isolated local tests pass. Cross-platform CI is checked before release;
 native Hook acceptance after upgrade/restart is recorded separately.
 
 ## Install
 
 ```sh
-codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.5
+codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.6
 codex plugin add codex-disk-cleanup@codex-disk-cleanup-marketplace
 ```
 
@@ -93,11 +94,10 @@ Dynamic shell/code paths and outputs are not evaluated. Deliverables and
 permanent tests belong in the project, not scratch.
 
 
-## 0.1.6 source candidate: review to quarantine and restore
+## 0.1.6: review to quarantine and restore
 
-Published and installed version remains 0.1.5. These commands are part of an
-unreleased, uninstalled 0.1.6 source candidate; native acceptance is pending.
-Development never processes real candidate files.
+The 0.1.6 release adds these commands. Native acceptance requires restart after
+installation. Release and installation never process actual review candidates.
 
 1. `review-list --session SESSION_ID` is read-only: exact paths, sizes, observation
    sources, manual purposes/choices, current metadata/parent identities and snapshot
@@ -164,13 +164,13 @@ python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" init --discover-temp
 python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" forget-temp --root /absolute/temp/task --yes
 ```
 
-Discovery defaults on for future candidate-version calls; changing it preserves
+Discovery defaults on for future calls; changing it preserves
 auto mode and other policy. Disable revokes discovery-based move plans but allows
 restore. Forget is metadata-only and refuses roots with unresolved quarantine:
 restore, explicitly purge or reconcile first. Optional schema1 state tables keep
 old read-only data working without initialization. Existing historical temp
 folders are not retroactively adopted. Full native lifecycle and cross-platform
-acceptance of this candidate remain separate checks.
+acceptance remain separate checks.
 
 ## 0.1.4: project scratch and dynamic paths
 

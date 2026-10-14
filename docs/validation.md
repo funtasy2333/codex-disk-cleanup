@@ -213,3 +213,14 @@ and linked paths, pending legacy/owner/foreign/overflow, read-only missing/old s
 explicit purge and interrupted-move recovery. All cleanup uses isolated fixtures.
 No actual user candidate was adopted, marked or moved; installed/public version
 remains0.1.5. Cross-platform CI, native dispatch and release/install are outstanding.
+
+## v0.1.6 release preparation — 2026-10-14
+
+The user authorized publication and installation. Runtime and 48 new review
+regressions remain identical to independently reviewed commit4512d5d. Rerun the
+full230-case suite and package checks; require six CI jobs green for the release
+commit. Use supported marketplace config/upgrade/install, retaining byte-identical
+0.1.5 files for active chats. Preserve quarantine policy and existing state; no
+review-mark/plan/apply or real-file cleanup occurs as an installation side effect.
+Native hook loading/trust and installed byte identity are checked separately from
+actual post-restart lifecycle execution.

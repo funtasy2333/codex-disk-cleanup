@@ -4,9 +4,9 @@
 
 为本地 Codex 构建的临时文件生命周期插件。Python 3.10+，运行时只用标准库。
 
-发布版本为 **0.1.5**，支持自动发现会话新建的专用系统临时目录，scratch 为可选位置。默认只预览；显式启用隔离模式后，文件移入可恢复的隔离区。永久删除是独立操作。
+发布版本为 **0.1.6**，支持自动发现新系统临时目录，以及审核、保留、确认隔离和恢复流程，scratch 为可选位置。默认只预览；显式启用隔离模式后，文件移入可恢复的隔离区。永久删除是独立操作。
 
-182 项本地隔离测试通过；发布前核对跨平台 CI，升级后的原生 Hooks 验收另行记录。GitHub 公开发布不等于已上架 OpenAI 公共插件目录。
+230 项本地隔离测试通过；发布前核对跨平台 CI，升级后的原生 Hooks 验收另行记录。GitHub 公开发布不等于已上架 OpenAI 公共插件目录。
 
 [English](docs/README.en.md) · [安全边界](SECURITY.md) · [设计](docs/design.md) · [验收记录](docs/validation.md)
 
@@ -14,7 +14,7 @@
 
 | 功能 | 行为 |
 | --- | --- |
-| 新建文件追踪 | 匹配 Pre/Post 观察新建文件；范围为本会话 scratch、明确登记的项目临时目录，以及候选版自动发现的新系统临时目录 |
+| 新建文件追踪 | 匹配 Pre/Post 观察新建文件；范围为本会话 scratch、明确登记的项目临时目录，以及自动发现的新系统临时目录 |
 | 自动整理 | SessionStart 提供受管位置说明并检查过期会话；Stop 整理当前回合；SessionEnd 整理结束会话 |
 | 默认预览 | 不移动文件；显式配置 `auto: quarantine` 后才自动隔离 |
 | 手动维护 | `deep` 检查明确登记的 `CODEX_HOME/cache`、`CODEX_HOME/logs` 子树，保留期限默认 30 天 |
@@ -32,7 +32,7 @@
 在支持插件命令的 Codex CLI 中：
 
 ```sh
-codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.5
+codex plugin marketplace add funtasy2333/codex-disk-cleanup --ref v0.1.6
 codex plugin add codex-disk-cleanup@codex-disk-cleanup-marketplace
 ```
 
@@ -78,9 +78,9 @@ python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" audit
 Windows 将上面的 `python3` 换为 `py -3`，并使用 PowerShell 对应的路径变量语法。
 
 
-## 0.1.6 源码候选：审核候选的处理流程
+## 0.1.6：审核候选的处理流程
 
-当前发布和安装版本仍为 0.1.5；以下功能属于尚未发布、安装及原生验收的 0.1.6 候选版。本次开发不处理实际审核候选。
+0.1.6 新增以下人工审核流程。安装后需重启再验证原生会话；发布和安装本身不处理实际审核候选。
 
 1. **展示文件及用途**：`review-list --session SESSION_ID` 只读展示文件路径、大小、观察来源、状态和人工说明的用途。尚未说明的用途显示为空，不能把观察来源当作已证实用途。列表包含当前身份和 `snapshot`；文件变化后必须重新展示、审核。
 2. **标记保留或隔离**：`review-mark` 指定会话、候选 ID、当前 snapshot、`keep` 或 `quarantine` 及非空用途说明。此步仅记决策，不移动文件。保留标记同时阻止该路径的自动隔离。
@@ -121,7 +121,7 @@ python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" init --discover-temp
 python3 "$PLUGIN_DIR/scripts/cleanup.py" --data "$DATA_DIR" forget-temp --root /absolute/temp/task --yes
 ```
 
-发现功能在候选版中默认开启，但不改变 `auto`。关闭功能使已有发现目录的移动计划失效，仍可恢复隔离文件。存在未恢复/未处理的隔离记录时，`forget-temp` 拒绝撤销，需先恢复、明确 purge 或完成恢复核对。SQLite schema 1 保持兼容，新增独立状态表，旧数据的只读 status 不创建表。
+发现功能默认开启，但不改变 `auto`。关闭功能使已有发现目录的移动计划失效，仍可恢复隔离文件。存在未恢复/未处理的隔离记录时，`forget-temp` 拒绝撤销，需先恢复、明确 purge 或完成恢复核对。SQLite schema 1 保持兼容，新增独立状态表，旧数据的只读 status 不创建表。
 
 现有 `/private/tmp/pfas-formal-review` 等历史目录不会回补创建记录或自动清理。修改仅影响升级后的未来调用，不能把目录里现存文件等同于本会话所有的临时文件。
 

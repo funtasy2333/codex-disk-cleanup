@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.6 — Unreleased (2026-10-14)
+## 0.1.6 — 2026-10-14
 
 - Add read-only candidate/use display, explicit keep/quarantine marking, exact
   subset plans and digest-plus-yes confirmation before reversible manual moves.
@@ -10,8 +10,9 @@
   or missing-cwd access. Never automatically approve or adopt review candidates.
 - Archive exact per-move authority for restore/purge/recover independently of
   queue eviction. Restore rebuilds keep protection without overwriting files.
-- Add 48 isolated workflow regressions; all 230 local tests pass. Source candidate
-  only: no real candidate processing, publication, install or native acceptance.
+- Add 48 isolated workflow regressions; all 230 local tests pass. Cross-platform CI is
+  checked before release; native acceptance after restart is separate. Release
+  and installation do not process actual review candidates.
 
 ## 0.1.5 — 2026-10-13
 
